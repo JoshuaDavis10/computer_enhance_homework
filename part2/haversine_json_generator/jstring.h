@@ -521,6 +521,17 @@ static jstring jstring_create_integer(i64 number, u32 digits)
 	char *tmp;
 	jstring return_string;
 
+	if(number == 0)
+	{
+		tmp = jstring_temporary_memory_allocate_string(2 * (1 + 1));
+		tmp[0] = '0';
+		tmp[1] = '\0';
+		return_string.data = tmp;
+		return_string.length = 1;
+		return_string.capacity = 2 * (return_string.length + 1);
+		jstring_log("jstring_create_integer: integer string -> %s", return_string.data);
+		return return_string;
+	}
 	
 	if(number < 0)
 	{
