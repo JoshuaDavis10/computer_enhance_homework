@@ -515,14 +515,13 @@ static b32 jstring_ends_with(jstring string, const char *chars)
 	return false;
 }
 
-/* TODO: this is a complete mess */
 /* NOTE: if digits is 0, we just make the number normal, so no zero padding */
-static jstring jstring_create_integer(i32 number, u32 digits)
+static jstring jstring_create_integer(i64 number, u32 digits)
 {
-	jstring_log("jstring_create_integer:");
-
+	char *tmp;
 	jstring return_string;
 
+	
 	if(number < 0)
 	{
 		if(digits > 0)
@@ -530,22 +529,85 @@ static jstring jstring_create_integer(i32 number, u32 digits)
 			JSTRING_ASSERT(0, "no leading 0s needed for a negative number, "
 				"just use 0 for 'digits' parameter");
 		}
-		/* TODO: negative number handle here */
+
+		digits = 1; /* NOTE(josh): for '-' character */
+		i64 temp_number = -number;
+		while(temp_number != 0)
+		{
+			temp_number = temp_number / 10;
+			digits++;
+		}
+		tmp = jstring_temporary_memory_allocate_string(2 * (digits + 1));
+
+		i32 digit = digits - 1;
+		number = -number;
+		while(digit > 0)
+		{
+			tmp[digit] = (number % 10) + 48;
+			number = number / 10;
+			digit--;
+		}
+		tmp[0] = '-';
+		tmp[digits] = '\0';
+		
+		return_string.data = tmp;
+		return_string.length = digits;
+		return_string.capacity = 2 * (return_string.length + 1);
+		jstring_log("jstring_create_integer: integer string -> %s", return_string.data);
 		return return_string;
 	}
 
-	/* number is positive */
+	/* number is positive and isn't a set # of digits */
 	if(digits == 0)
 	{
-		/* TODO: positive number with no leading 0s case */
+		i64 temp_number = number;
+		while(temp_number != 0)
+		{
+			temp_number = temp_number / 10;
+			digits++;
+		}
+		tmp = jstring_temporary_memory_allocate_string(2 * (digits + 1));
+
+		i32 digit = digits - 1;
+		while(digit >= 0)
+		{
+			tmp[digit] = (number % 10) + 48;
+			number = number / 10;
+			digit--;
+		}
+		tmp[digits] = '\0';
+		return_string.data = tmp;
+		return_string.length = digits;
+		return_string.capacity = 2 * (return_string.length + 1);
+		jstring_log("jstring_create_integer: integer string -> %s", return_string.data);
 		return return_string;
 	}
 
-	/* number needs leading 0s or I guess just limit the amount of digits? */
+	/* number needs to be a set number of digits, add leading 0s if necessary */
+	tmp = jstring_temporary_memory_allocate_string(2 * (digits + 1));
 
-	return_string.data = ;
+
+	i32 digit = digits - 1;
+	while(digit >= 0)
+	{
+		if(number == 0)
+		{
+			tmp[digit] = '0';
+		}
+		else
+		{
+			tmp[digit] = (number % 10) + 48; 
+			number = number / 10;
+		}
+		digit--;
+	}
+
+	tmp[digits] = '\0';
+
+	return_string.data = tmp;
 	return_string.length = digits;
 	return_string.capacity = 2 * (return_string.length + 1);
+	jstring_log("jstring_create_integer: integer string -> %s", return_string.data);
 	return return_string;
 }
 
@@ -556,7 +618,7 @@ json generator thing) - josh
 */
 static jstring jstring_create_double(f64 number, u32 precision)
 {
-	i32 integer_part = (i32)number;
+	i64 integer_part = (i64)number;
 	f64 fractional_part = (f64)number - (f64)integer_part;
 	if(fractional_part < 0.0)
 	{
@@ -574,8 +636,8 @@ static jstring jstring_create_double(f64 number, u32 precision)
 			tmp++;
 		}
 	}
-	jstring_log("fractional part: %lf", fractional_part);
-	jstring fractional_part_string = jstring_create_integer((i32)fractional_part, precision);
+	u64 temp_integer_frac = (u64)fractional_part;
+	jstring fractional_part_string = jstring_create_integer((i64)fractional_part, precision);
 	u32 frac_part_length = fractional_part_string.length;
 	for( ; frac_part_length < precision; frac_part_length++)
 	{

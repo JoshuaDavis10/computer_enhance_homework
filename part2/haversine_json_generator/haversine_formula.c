@@ -27,5 +27,5 @@ static f64 reference_haversine(f64 X0, f64 Y0, f64 X1, f64 Y1, f64 earth_radius)
     
     f64 result = earth_radius * c;
     
-    return earth_radius;
+    return result;
 }

@@ -105,9 +105,15 @@ int main(int argc, char **argv)
 		f64 x1 = get_random_double(180.0);
 		f64 y1 = get_random_double(90.0);
 
-		log_debug("\nx0: %lf\ny0: %lf\nx1: %lf\ny1: %lf", x0, y0, x1, y1);
+		log_debug("\nx0: %.16lf\ny0: %.16lf\nx1: %.16lf\ny1: %.16lf", x0, y0, x1, y1);
 
 		/* calculate distance and store in answers file/accumulator */
+		/* NOTE(josh): 6372.8 is the earth radius value casey uses */
+		f64 reference_calculation = reference_haversine(x0, y0, x1, y1, 6372.8);
+		log_debug("reference haversine -> %.16lf", reference_calculation);
+		log_debug("reference haversine -> %.16x", reference_calculation);
+		haversine_distance_accumulator += reference_calculation;
+		write(haversine_answers_fd, &reference_calculation, 8);
 
 		/* write points to input .json */
 		jstring x0_string = jstring_create_double(x0, 16);
@@ -117,7 +123,7 @@ int main(int argc, char **argv)
 
 			/* x0 */
 		jstring json_point_pair_string = 
-			jstring_create_temporary("{\"x0\":", jstring_length("{\"x0\":"));
+			jstring_create_temporary("\t{\"x0\":", jstring_length("\t{\"x0\":"));
 		if(!jstring_concatenate_jstring(&json_point_pair_string, x0_string))
 		{
 			_assert(0);	
@@ -158,9 +164,6 @@ int main(int argc, char **argv)
 			_assert(0);	
 		}
 
-		log_trace("json point pair string: %s", json_point_pair_string.data);
-		log_trace("length: %u, claimed length: %u", jstring_length(json_point_pair_string.data),
-			json_point_pair_string.length);
 		if( write(
 			haversine_input_json_fd, 
 			json_point_pair_string.data, 
@@ -177,6 +180,11 @@ int main(int argc, char **argv)
 
 	jstring json_end_string = jstring_create_temporary("]}\n", jstring_length("]}\n"));
 	write(haversine_input_json_fd, json_end_string.data, json_end_string.length);
+	f64 haversine_average = haversine_distance_accumulator / ((f64)point_pairs_count);
+	write(haversine_answers_fd, &haversine_average, 8);
+	log_debug("haversine average: %.16lf", haversine_average);
+	log_debug("haversine average: %.16x", haversine_average);
+
 
 	if(close(haversine_input_json_fd) == -1)
 	{
@@ -187,6 +195,11 @@ int main(int argc, char **argv)
 		_assert(0);
 	}
 
+	jstring_memory_reset(JSTRING_MEMORY_SIZE, jstring_memory);
 	free(jstring_memory);
+
+	f64 test_float = 0x40ad7aeef7ea0e65;
+	log_debug("0e65 f7ea 7aee 40ad as float -> %.16lf", test_float); 
+
 	return(0);
 }
