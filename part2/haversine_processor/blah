@@ -1,0 +1,114 @@
+
+	/* TODO: this prepass code can I think be used for both array and object parsing, so put it in a function that 
+	 * returns value count
+	 */
+	u32 bracket_depth = 1; /* '[' .. since we got a bracket in the first place from it being an array */
+	u32 brace_depth = 0; /* '{' */
+	u64 prepass_json_txt_offset = *json_txt_offset;
+	b32 in_value = false;
+	b32 in_string = false;
+
+	/* NOTE: just set it to 1, cuz even in the case where it's just [ ], the parsing done after the prepass will catch
+	 * that
+	 */
+	u32 value_count = 1;
+
+	/* once bracket_depth is 0 (i.e. we've found the closing bracket of the array, we know we reached the end */
+	log_trace("json_parse_array: doing prepass to determine number of values in the array...");
+	prepass_json_txt_offset++; /* get past the '[' we started with */
+	while(bracket_depth != 0)
+	{
+		/* should just be # commas that aren't within values ? */
+		/* true, false, null won't contain commas */
+		/* so if first char, after whitespace is '[', '{' or '"', we ignore commas until we meet another one, or like
+		 * the corresponding 'closing' one */
+		/* NOTE: also need to ignore \" if encountered within a string. WAIT NVM, \" is its own char, not 2 chars lol */
+		switch(json_txt[prepass_json_txt_offset])
+		{
+			case ' ':
+			case '\n':
+			case '\r':
+			case '\t':
+			{
+				/* do nothing */
+			} break;
+			case ',':
+			{
+				/* NOTE: in the case where there are 2 back to back commas, we'll just get a parse error later
+				 * when we actually parse the array, so can ignore that case here
+				 */
+				if((!in_value) && (!in_string))
+				{
+					value_count++;
+				}
+			} break;
+			case '{':
+			{
+				if(!in_string)
+				{
+					brace_depth++;
+					if(!in_value)
+					{
+						in_value = true;
+					}
+				}
+			} break;
+			case '}':
+			{
+				if(!in_string)
+				{
+					brace_depth--;
+					if(brace_depth == 0 && bracket_depth == 1)
+					{
+						in_value = false;
+					}
+				}
+			} break;
+			case '[':
+			{
+				if(!in_string)
+				{
+					bracket_depth++;
+					if(!in_value)
+					{
+						in_value = true;
+					}
+				}
+			} break;
+			case ']':
+			{
+				if(!in_string)
+				{
+					bracket_depth--;
+					if(brace_depth == 0 && bracket_depth == 1)
+					{
+						in_value = false;
+					}
+				}
+			} break;
+			case '"':
+			{
+				if(in_string)
+				{
+					in_string = false;
+				}
+				else
+				{
+					in_string = true;
+				}
+			}  break;
+
+			default:
+			{
+				/* do nothing */
+			} break;
+		}
+
+		log_trace("\tprepass - char: '%c' | bracket depth: %u | brace depth: %u | in value? %u | in string? %u | value count: %u",
+				json_txt[prepass_json_txt_offset], bracket_depth, brace_depth, in_value, in_string, value_count);
+
+		prepass_json_txt_offset++;
+		_assert(prepass_json_txt_offset < json_txt_size);
+	}
+
+

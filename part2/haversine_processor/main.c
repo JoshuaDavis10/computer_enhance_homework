@@ -44,14 +44,16 @@ int main(int argc, char **argv)
 	
 	if((input_json_fd = open(argv[1], O_RDONLY)) == -1)
 	{
-		log_error("Failed to open file: %s (errno: %d). Terminating program.", argv[1], errno);
+		log_error("Failed to open file: %s (errno: %d). Terminating program.", 
+			argv[1], errno);
 		return(-1);
 	}
 	log_info("Input json file has been opened.");
 
 	if(stat(argv[1], &input_json_file_stat) == -1)
 	{
-		log_error("Failed to stat(2) file: %s (errno: %d). Terminating program.", argv[1], errno);
+		log_error("Failed to stat(2) file: %s (errno: %d). Terminating program.", 
+			argv[1], errno);
 		return(-1);
 	}
 	log_info("Input json file has been stat'd.");
@@ -64,13 +66,19 @@ int main(int argc, char **argv)
 	input_json_txt = malloc(input_json_file_size+1); /* +1 for null terminator */
 	if(read(input_json_fd, input_json_txt, input_json_file_stat.st_size) == -1)
 	{
-		log_error("Failed to read(2) file: %s (errno: %d). Terminating program.", argv[1], errno);
+		log_error("Failed to read(2) file: %s (errno: %d). Terminating program.", 
+			argv[1], errno);
 		return(-1);
 	}
 	input_json_txt[input_json_file_size] = '\0';
 	log_info("Input json file contents have been read into a buffer.");
 
 	jstring_memory = malloc((input_json_file_size+1) * 2);
+	if(!jstring_load_logging_function(log_trace))
+	{
+		log_error("Failed to load jstring logging function. Terminating program.");
+		return(-1);
+	}
 	if(!jstring_memory_activate( ((input_json_file_size+1)*2), jstring_memory))
 	{
 		log_error("Failed to activate jstring memory. Terminating program.");
@@ -79,11 +87,19 @@ int main(int argc, char **argv)
 
 	json_value json_parse_result;
 	u32 json_parse_value_count = 
-		json_parse(input_json_txt, input_json_file_size, &json_parse_result);
+		json_parse(input_json_txt, input_json_file_size, &json_parse_result, 1);
 
 	/* NOTE(josh): in our case, there's just gonna be one top-level .json object */
 	_assert(json_parse_value_count == 1);
 
 	debug_print_json_value(&json_parse_result);
+
+	/* TODO: load the json value data into just like an array of floats
+	 * you'll have to do this since your json parser is more general
+	 */
+
+	/* TODO: do the calculations */
+
+	json_memory_clear();
 	return(0);
 }

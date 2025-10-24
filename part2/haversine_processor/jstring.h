@@ -205,6 +205,8 @@ static jstring jstring_create_temporary(
 		}
 		jstring_temporary_memory_insertion_address[index] = chars[index];
 	}
+
+	/*
 	if(chars[length] != '\0')
 	{
 		jstring_log("jstring_create_temporary: "
@@ -218,9 +220,55 @@ static jstring jstring_create_temporary(
 		result_jstring.data = 0;
 		return result_jstring;
 	}
+	*/
+
 	jstring_temporary_memory_insertion_address[length] = '\0';
 
 	result_jstring.data = jstring_temporary_memory_insertion_address;
+
+	return result_jstring;
+}
+
+/* TODO: horrible name, idk just needed it for the json parser */
+static jstring jstring_create_temporary_from_initial_chars(const char *chars, u64 length)
+{
+	jstring result_jstring;
+	result_jstring.length = 0;
+	result_jstring.capacity = 0;
+	result_jstring.data = 0;
+	if(chars == 0)
+	{
+		jstring_log("jstring_create_temporary_from_initial_chars: got passed null string"
+				" for data: %p. returning zeroed out jstring struct.",
+				chars);
+		return result_jstring;
+	}
+
+	result_jstring.length = length;
+	result_jstring.capacity = 2 * (length + 1);
+
+	char *tmp = 
+		jstring_temporary_memory_allocate_string(
+				result_jstring.capacity);
+
+	u32 index;
+	for(index = 0; index < length; index++)
+	{
+		if(chars[index] == '\0')
+		{
+			jstring_log("jstring_create_temporary_from_initial_chars: "
+					"hit null terminator sooner than expected. "
+					"returning zeroed out jstring struct.");
+			result_jstring.length = 0;
+			result_jstring.capacity = 0;
+			result_jstring.data = 0;
+			return result_jstring;
+		}
+		tmp[index] = chars[index];
+	}
+	tmp[length] = '\0';
+
+	result_jstring.data = tmp;
 
 	return result_jstring;
 }
