@@ -10,6 +10,7 @@ static f64 radians_from_degrees(f64 degrees)
     return result;
 }
 
+/* NOTE: earth_radius value should be 6372.8 */
 static f64 reference_haversine(f64 X0, f64 Y0, f64 X1, f64 Y1, f64 earth_radius)
 {
     f64 lat1 = Y0;

@@ -159,9 +159,19 @@ int main(int argc, char **argv)
 			_assert(0);	
 		}
 
-		if(!jstring_concatenate_raw(&json_point_pair_string, "},\n"))
+		if(point_pairs_index == point_pairs_count - 1)
 		{
-			_assert(0);	
+			if(!jstring_concatenate_raw(&json_point_pair_string, "}\n"))
+			{
+				_assert(0);	
+			}
+		}
+		else
+		{
+			if(!jstring_concatenate_raw(&json_point_pair_string, "},\n"))
+			{
+				_assert(0);	
+			}
 		}
 
 		if( write(

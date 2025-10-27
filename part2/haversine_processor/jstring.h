@@ -710,36 +710,124 @@ static jstring jstring_create_double(f64 number, u32 precision)
 	return(integer_part_string);
 }
 
-static u32 jstring_chars_to_int(const char *chars)
+/* TODO: handle negative numbers */
+static i64 jstring_chars_to_int(const char *chars, i32 length, b32 zero_start_okay)
 {
 	/* NOTE(josh): storing in a u64 cuz I want to have some upper limit that the 
 		function can check for so that it won't keep reading a VERY long string of numbers.
 		I didn't think about it very hard, but this is the result 
 	*/
-	u64 temp = 0; 
-	u32 index = 0;
+	i64 temp = 0; 
+	i32 index = 0;
+	b32 negative = false;
 
 	if(chars[0] == '0' && chars[1] == '\0')
 	{
+		JSTRING_ASSERT((length == 1) || (length == -1), 
+			"got number: '0', which has length 1, "
+			"but length parameter of jstring_chars_to_int was not 1");
 		return(0);
 	}
-	JSTRING_ASSERT( (chars[0] != '0'), 
-		"first character should not be 0, since first digit in a number should not be 0");
-	while(chars[index] != '\0')
+
+	if(!zero_start_okay)
 	{
-		JSTRING_ASSERT( ((chars[index] >= 48) && (chars[index] <= 57)), 
-			"character is not a number");
-
-		JSTRING_ASSERT((temp < 0xFFFFFFFF), 
-			"resulting number will not fit in a 32 bit integer. overflow will occur.");
-
-		temp = (temp * 10) + (chars[index] - 48);
-		index++;
+		if(length != 1)
+		{
+			JSTRING_ASSERT( (chars[0] != '0'), 
+				"first character should not be 0, since first digit in a "
+				"number should not be 0");
+		}
 	}
-	return((u32)temp);
+
+	if(chars[0] == '-')
+	{
+		negative = true;
+		index = 1;
+	}
+
+	if(length == -1)
+	{
+		while(chars[index] != '\0')
+		{
+			JSTRING_ASSERT( ((chars[index] >= 48) && (chars[index] <= 57)), 
+				"character is not a number");
+	
+			temp = (temp * 10) + (chars[index] - 48);
+			index++;
+		}
+	}
+	else
+	{
+		while(index < length)
+		{
+			JSTRING_ASSERT( ((chars[index] >= 48) && (chars[index] <= 57)), 
+				"character is not a number");
+	
+			temp = (temp * 10) + (chars[index] - 48);
+			index++;
+		}
+	}
+	if(negative)
+	{
+		return(-temp);
+	}
+	return(temp);
+}
+
+/* TODO: handle if length == -1 to just read until the null terminator found */
+static f64 jstring_chars_to_double(const char *chars, i32 length)
+{
+	f64 result;
+	i32 period_index = -1; /* NOTE: -1 period_index indicates no period */
+
+	i32 index = 0;
+	for( ; index < length; index++)
+	{
+		if(chars[index] == '.')
+		{
+			period_index = index;
+			break;
+		}
+	}
+
+	if(period_index == -1)
+	{
+		return ((f64)jstring_chars_to_int(chars, length, false));
+	}
+	i32 decimal_part_length = length - period_index - 1; /* NOTE -1 for '.' */
+
+	f64 integer_part = (f64)jstring_chars_to_int(chars, period_index, false);
+	f64 decimal_part = 
+		/* NOTE: +1 for '.' */
+		(f64)jstring_chars_to_int((chars + period_index + 1), (decimal_part_length), true);
+
+	result += integer_part;
+
+	u32 tmp = 0;
+	for( ; tmp < decimal_part_length; tmp++)
+	{
+		decimal_part = decimal_part / 10.0;
+	}
+
+	if(result < 0.0)
+	{
+		result -= decimal_part;
+	}
+	else
+	{
+		result += decimal_part;
+	}
+
+	return(result);
 }
 
 static u32 jstring_jstring_to_int(jstring string)
+{
+	/* TODO: */
+	return(0);
+}
+
+static f64 jstring_jstring_to_double(jstring string)
 {
 	/* TODO: */
 	return(0);

@@ -29,6 +29,7 @@ typedef unsigned int b32;
 int main(int argc, char **argv)
 {
 	i32 input_json_fd;
+	i32 input_answers_fd;
 	struct stat input_json_file_stat;
 	char *input_json_txt;
 	u64 input_json_file_size;
@@ -40,6 +41,16 @@ int main(int argc, char **argv)
 			"./haversine_processor [input haversine json]\n"
 			"./haversine_processor [input haversine json] [input haversine answers]");
 		return(-1);
+	}
+
+	if(argc == 3)
+	{
+		if((input_answers_fd = open(argv[2], O_RDONLY)) == -1)
+		{
+			log_error("Failed to open file: %s (errno: %d). Terminating program.", 
+				argv[2], errno);
+			return(-1);
+		}
 	}
 	
 	if((input_json_fd = open(argv[1], O_RDONLY)) == -1)
@@ -85,21 +96,102 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	json_value json_parse_result;
+	json_value *json_parse_result = malloc(sizeof(json_value));
 	u32 json_parse_value_count = 
-		json_parse(input_json_txt, input_json_file_size, &json_parse_result, 1);
+		json_parse(input_json_txt, input_json_file_size, json_parse_result, 1);
 
 	/* NOTE(josh): in our case, there's just gonna be one top-level .json object */
 	_assert(json_parse_value_count == 1);
 
-	debug_print_json_value(&json_parse_result);
+	/* debug_print_json_value(json_parse_result); */
 
-	/* TODO: load the json value data into just like an array of floats
-	 * you'll have to do this since your json parser is more general
-	 */
+	_assert(json_parse_result->type == JSON_VALUE_OBJECT);
+	_assert(json_parse_result->object->values_count == 1);
+	_assert(json_parse_result->object->values[0].type == JSON_VALUE_ARRAY);
 
-	/* TODO: do the calculations */
+	json_value *haversine_points_list = json_parse_result->object->values[0].array->values;
+	u32 haversine_points_count = json_parse_result->object->values[0].array->values_count;
+	u32 haversine_points_index = 0;
+	f64 x0, y0, x1, y1;
+	f64 haversine_accumulator = 0.0;
+	for( ; haversine_points_index < haversine_points_count; haversine_points_index++)
+	{
+		_assert(haversine_points_list[haversine_points_index].type == JSON_VALUE_OBJECT);
+		json_object *haversine_points_object = 
+			haversine_points_list[haversine_points_index].object;
+		
+		_assert(haversine_points_object->values_count == 4);
+		_assert(haversine_points_object->values[0].type == JSON_VALUE_NUMBER);
+		_assert(haversine_points_object->values[1].type == JSON_VALUE_NUMBER);
+		_assert(haversine_points_object->values[2].type == JSON_VALUE_NUMBER);
+		_assert(haversine_points_object->values[3].type == JSON_VALUE_NUMBER);
+
+		x0 = haversine_points_object->values[0].number;
+		y0 = haversine_points_object->values[1].number;
+		x1 = haversine_points_object->values[2].number;
+		y1 = haversine_points_object->values[3].number;
+
+		f64 reference_haversine_distance =
+			reference_haversine(x0, y0, x1, y1, 6372.8);
+
+		haversine_accumulator+=reference_haversine_distance;
+
+		log_info("reference_haversine (x0:%.16lf, y0:%.16lf, x1:%.16lf, y1:%.16lf):"
+			 "\n\t%.16lf", x0, y0, x1, y1, reference_haversine_distance);
+
+		if(argc == 3)
+		{
+			f64 haversine_answer; 
+			if(read(input_answers_fd, &haversine_answer, sizeof(f64)) == -1)
+			{
+				log_error("Failed to read(2) file: %s (errno: %d). "
+					  "Terminating program.", argv[2], errno);
+				return(-1);
+			}
+
+			f64 diff = haversine_answer - reference_haversine_distance;
+			if( (diff > 0.000000000001) || (diff < -0.000000000001) )
+			{
+				log_error("check against answer:\n\t%.16lf == %.16lf", 
+					reference_haversine_distance, haversine_answer);
+			}
+			else
+			{
+				log_info("check against answer:\n\t%.16lf == %.16lf", 
+					reference_haversine_distance, haversine_answer);
+			}
+		}
+	}
+
+	if(argc == 3)
+	{
+		f64 haversine_average = haversine_accumulator / ((f64)haversine_points_count);
+		f64 haversine_average_answer;
+		if(read(input_answers_fd, &haversine_average_answer, sizeof(f64)) == -1)
+		{
+			log_error("Failed to read(2) file: %s (errno: %d). "
+				  "Terminating program.", argv[2], errno);
+			return(-1);
+		}
+		f64 diff = haversine_average_answer - haversine_average;
+		if( (diff > 0.000000000001) || (diff < -0.000000000001) )
+		{
+			log_error("\ncheck average against answer:\n\t%.16lf == %.16lf\n", 
+				haversine_average, haversine_average_answer);
+		}
+		else
+		{
+			log_info("\ncheck average against answer:\n\t%.16lf == %.16lf\n", 
+				haversine_average, haversine_average_answer);
+		}
+	}
 
 	json_memory_clear();
+	log_trace("freeing stuff that was malloc'd in main() --"
+	   " input_json_txt, jstring_memory, json_parse_result...");
+	free(input_json_txt);
+	free(jstring_memory);
+	free(json_parse_result);
+	log_info("all done.");
 	return(0);
 }

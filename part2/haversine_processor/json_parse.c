@@ -12,13 +12,14 @@ typedef enum {
 typedef struct json_value json_value;
 
 typedef struct {
-	/* TODO(josh): need to be able to have these be darrays. uh oh memory leaks? */
 	jstring *keys; 
 	json_value *values;
+	u32 values_count;
 } json_object;
 
 typedef struct {
 	json_value *values;
+	u32 values_count;
 } json_array;
 
 typedef struct json_value {
@@ -30,8 +31,11 @@ typedef struct json_value {
 	 * matter for our uses withing computer enhance 
 	 */
 	jstring string;
+	/* NOTE(josh): ima just do floating point numbers for now but technically we should
+	 * do a union type here for doubles or integers 
+	 */
 	f64 number;
-	/* nothing needed for true, false, or null, cuz the type tells it all */
+	/* NOTE: nothing needed for true, false, or null, cuz the type tells it all in those cases */
 } json_value;
 
 /* json memory for all the objects and things */
@@ -44,14 +48,15 @@ b32 json_memory_initialize(u64 size)
 	if(json_memory)
 	{
 		log_error("json_memory_initialize: json memory has already been initialized."
-				  " re-initializing would likely result in lost data. returning 'false'");
+			  " re-initializing would likely result in lost data. returning 'false'");
 		return(false);
 	}
 	json_memory = malloc(size);
 	if(!json_memory)
 	{
 		_assert(0);
-		log_error("json_memory_initialize: failed to initialize json memory. returning 'false'");
+		log_error("json_memory_initialize: failed to initialize json memory. "
+			  "returning 'false'");
 		return(false);
 	}
 	json_memory_size = size;
@@ -64,16 +69,27 @@ void *json_memory_allocate(u64 size)
 	_assert(json_memory);
 	if((json_memory_offset + size) > json_memory_size)
 	{
+		/* TODO: I realized that realloc'ing screws up all the pointers,
+		 * so I've setup asserts to stop that from happening. that way you'll know
+		 * when you've used more memory than used at initialization... until I figure
+		 * out a better memory solution, you'll just have to manually decide how much
+		 * to allocate up front. It was a worthy pursuit but it's barely functional
+		 */
 		while(json_memory_offset + size > json_memory_size)
 		{
+			log_trace("json_memory_allocate: realloc'ing to %u bytes", 
+				json_memory_size*2);
+			void *tmp = json_memory;
 			json_memory = realloc(json_memory, json_memory_size * 2);
+			_assert(json_memory == tmp);
 			json_memory_size = json_memory_size * 2;
-			log_trace("json_memory_allocate: realloc'd to %u bytes", json_memory_size);
 		}
 	}
 	void *return_address = ((char*)json_memory + json_memory_offset);
 	json_memory_offset+=size;
-	log_trace("json_memory_allocate: allocated %u bytes @%p", size, json_memory);
+	log_trace("json_memory_allocate: allocated %u bytes @%p", size, return_address); 
+	log_trace("json_memory_allocate: total allocated: %u bytes", json_memory_size);
+	log_trace("json_memory_allocate: total used     : %u bytes", json_memory_offset);
 	return(return_address); 
 }
 
@@ -83,6 +99,7 @@ void *json_memory_allocate(u64 size)
  */
 void json_memory_clear()
 {
+	free(json_memory);
 	json_memory = 0;
 	json_memory_size = 0;
 	json_memory_offset = 0;
@@ -103,8 +120,8 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
  * returns number of json values in the .json text
  */
 
-/* XXX: NOTE TO SELF THROW log_traces's EVERYWHERE */
-/* XXX: NOTE TO SELF there's a null terminator at the end of json_txt @index json_txt_size*/
+/* NOTE: TO SELF THROW log_traces's EVERYWHERE */
+/* NOTE: TO SELF there's a null terminator at the end of json_txt @index json_txt_size*/
 u32 json_parse(
 	char *json_txt, 
 	u64 json_txt_size, 
@@ -116,20 +133,24 @@ u32 json_parse(
 	_assert(jstring_temporary_memory_info.offset == 0);
 	_assert(jstring_temporary_memory_info.size >= ((json_txt_size+1)*2) );
 
-	json_memory_initialize(json_txt_size);
+	/* TODO: I realized that realloc'ing screws up all the pointers,
+	 * so I've setup asserts to stop that from happening. that way you'll know
+	 * when you've used more memory than used at initialization... until I figure
+	 * out a better memory solution, you'll just have to manually decide how much
+	 * to allocate up front. It was a worthy pursuit but it's barely functional
+	 */
+	json_memory_initialize(json_txt_size * 4);
 
 	u64 json_txt_offset = 0;
 	/* NOTE(josh): these refer to the highest level json "values" i.e. a [] or {} with
 	 * no associated name. in our case there should only ever be one which is just 
 	 */
 	u32 json_value_count = 0;
-	log_trace("json_parse: trimming any inital whitespace...");
 	if(!json_parse_whitespace(json_txt, json_txt_size, &json_txt_offset))
 	{
 		log_error("json_parse: json parse failed.");
 		return(0);
 	}
-	log_trace("json_parse: first non-whitespace token: %c", json_txt[json_txt_offset]);
 	
 	while(json_txt_offset < json_txt_size)
 	{
@@ -164,7 +185,6 @@ u32 json_parse(
 				return(0);
 			}
 			log_trace("json_parse: parsing an array...");
-			/* TODO: parse array */
 			json_array *tmp = 
 				json_parse_array(json_txt, json_txt_size, &json_txt_offset);
 			_assert(tmp);
@@ -175,28 +195,32 @@ u32 json_parse(
 		else
 		{
 			log_error("json_parse: expected first non-whitespace token to be '{'"
-				  " or '['.");
+				  " or '[', but got: %c", json_txt[json_txt_offset]);
 			log_error("json_parse: json parse failed.");
 			return(0);
 		}
+
+		if(!json_parse_whitespace(json_txt, json_txt_size, &json_txt_offset))
+		{
+			_assert(0);
+		}
 	}
 
+	log_trace("json_parse: parse completed.");
 	return(json_value_count);
 }
 
 b32 json_parse_whitespace(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	log_trace("parsing whitespace...");
 	b32 test;
 	while(1)
 	{
-		log_debug("json txt offset: %u", *json_txt_offset);
 		if(*json_txt_offset >= json_txt_size)
 		{
-			log_error("json_parse_whitespace: cannot read from offset (%u), "
+			log_warn("json_parse_whitespace: cannot read from offset (%u), "
 					  "json text size is %u bytes.", 
 					  *json_txt_offset, json_txt_size);
-			return(false);
+			return(true);
 		}
 
 		test = 
@@ -210,7 +234,7 @@ b32 json_parse_whitespace(char *json_txt, u64 json_txt_size, u64 *json_txt_offse
 			break;
 		}
 
-		*json_txt_offset++;
+		(*json_txt_offset)++;
 	}
 	return(true);
 }
@@ -223,25 +247,25 @@ json_object *json_parse_object(char *json_txt, u64 json_txt_size, u64 *json_txt_
 
 	u32 value_count = json_get_object_value_count(json_txt, json_txt_size, json_txt_offset);
 
-	log_debug("sizeof(json_value): %u", sizeof(json_value));
 	result->keys = (jstring *)json_memory_allocate(sizeof(jstring) * value_count);
 	result->values = (json_value *)json_memory_allocate(sizeof(json_value) * value_count);
+	result->values_count = value_count;
 	_assert(result->values);
 
 	(*json_txt_offset)++;
+	_assert(*json_txt_offset < json_txt_size);
 	u32 value_index;
 	for(value_index = 0; value_index < value_count; value_index++)
 	{
-		log_trace("json_parse_object: parsing value %u of object...", value_index);
 		if(!json_parse_whitespace(json_txt, json_txt_size, json_txt_offset))
 		{
 			_assert(0);
 		}
 
-		log_trace("json_parse_object: parsing key for value %u...", value_index);
 		u32 key_string_length = 0;
 		_assert(json_txt[*json_txt_offset] == '"');
 		(*json_txt_offset)++;
+		_assert(*json_txt_offset < json_txt_size);
 		while(json_txt[*json_txt_offset + key_string_length] != '"')
 		{
 			key_string_length++;
@@ -252,7 +276,7 @@ json_object *json_parse_object(char *json_txt, u64 json_txt_size, u64 *json_txt_
 			jstring_create_temporary(key_string, key_string_length);
 		/* NOTE: + 1 to deal with the closing '"' */
 		(*json_txt_offset) += key_string_length + 1; 
-		log_debug("key for value %u -> %s", value_index, result->keys[value_index].data);
+		_assert(*json_txt_offset < json_txt_size);
 
 		if(!json_parse_whitespace(json_txt, json_txt_size, json_txt_offset))
 		{
@@ -261,12 +285,35 @@ json_object *json_parse_object(char *json_txt, u64 json_txt_size, u64 *json_txt_
 
 		_assert(json_txt[*json_txt_offset] == ':');
 		(*json_txt_offset)++;
+		_assert(*json_txt_offset < json_txt_size);
 
-		log_trace("json_parse_object: parsing actual value %u...", value_index);
 		result->values[value_index] = 
 			/* NOTE: the magic really happens in json_parse_value I guess */
 			json_parse_value(json_txt, json_txt_size, json_txt_offset);
+
+		/* NOTE: get past comma/whitespace at end of value */
+		if(!json_parse_whitespace(json_txt, json_txt_size, json_txt_offset))
+		{
+			_assert(0);
+		}
+
+		if(value_index == value_count - 1) { }
+		else 
+		{
+			_assert(json_txt[*json_txt_offset] == ',');
+			(*json_txt_offset)++;
+			_assert(*json_txt_offset < json_txt_size);
+		}
 	}
+
+	if(!json_parse_whitespace(json_txt, json_txt_size, json_txt_offset))
+	{
+		_assert(0);
+	}
+
+	_assert(json_txt[*json_txt_offset] == '}');
+	(*json_txt_offset)++;
+	_assert(*json_txt_offset < json_txt_size);
 
 	return(result);
 }
@@ -279,16 +326,47 @@ json_array *json_parse_array(char *json_txt, u64 json_txt_size, u64 *json_txt_of
 
 	u32 value_count = json_get_array_value_count(json_txt, json_txt_size, json_txt_offset);
 
-	log_debug("sizeof(json_value): %u", sizeof(json_value));
 	result->values = (json_value *)json_memory_allocate(sizeof(json_value) * value_count);
+	result->values_count = value_count;
 	_assert(result->values);
 
-	/* TODO: now actually parse the array and stick the stuff in values. 
-	 * but its very good that we prepassed bc now the array for all the 
-	 * array's values has been allocated
-	 */
+	(*json_txt_offset)++;
+	_assert(*json_txt_offset < json_txt_size);
+	u32 value_index;
+	for(value_index = 0; value_index < value_count; value_index++)
+	{
+		if(!json_parse_whitespace(json_txt, json_txt_size, json_txt_offset))
+		{
+			_assert(0);
+		}
 
-	/* parse value for each one I guess */
+		result->values[value_index] = 
+			/* NOTE: the magic really happens in json_parse_value I guess */
+			json_parse_value(json_txt, json_txt_size, json_txt_offset);
+
+		/* NOTE: get past comma/whitespace at end of value */
+		if(!json_parse_whitespace(json_txt, json_txt_size, json_txt_offset))
+		{
+			_assert(0);
+		}
+
+		if(value_index == value_count - 1) { }
+		else 
+		{
+			_assert(json_txt[*json_txt_offset] == ',');
+			(*json_txt_offset)++;
+			_assert(*json_txt_offset < json_txt_size);
+		}
+	}
+
+	if(!json_parse_whitespace(json_txt, json_txt_size, json_txt_offset))
+	{
+		_assert(0);
+	}
+
+	_assert(json_txt[*json_txt_offset] == ']');
+	(*json_txt_offset)++;
+	_assert(*json_txt_offset < json_txt_size);
 
 	return(result);
 }
@@ -297,38 +375,67 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 {
 	json_value result;
 	/* NOTE: no whitespace to trim since caller would have done that already */
-	log_trace("json_parse_value: first char in value: '%c'", json_txt[*json_txt_offset]);
 
 	switch(json_txt[*json_txt_offset])
 	{
 		case '{':
 		{
 			/* object */
+			log_trace("json_parse_value: parsing an object...");
+			result.type = JSON_VALUE_OBJECT;
+			result.object = 
+				json_parse_object(json_txt, json_txt_size, json_txt_offset);
 		} break;
 		case '[':
 		{
 			/* array */
+			log_trace("json_parse_value: parsing an array...");
+			result.type = JSON_VALUE_ARRAY;
+			result.array = 
+				json_parse_array(json_txt, json_txt_size, json_txt_offset);
 		} break;
 		case '"':
 		{
+			/* TODO: this case will never be tested by the haversine input json */
 			/* string */
+			log_trace("json_parse_value: parsing a string...");
+			result.type = JSON_VALUE_STRING;
+			u32 string_length = 0;
+			while(json_txt[*json_txt_offset + string_length] != '"')
+			{
+				string_length++;
+				_assert( ((*json_txt_offset) + string_length) < json_txt_size);
+			}
+			const char *string_start = json_txt + (*json_txt_offset);
+			result.string = 
+				jstring_create_temporary(string_start, string_length);
+			/* NOTE: + 1 to deal with the closing '"' */
+			(*json_txt_offset) += string_length + 1; 
+			_assert(*json_txt_offset < json_txt_size);
 		} break;
 		case 't':
 		{
+			/* TODO: this case will never be tested by the haversine input json */
+			/* NOTE: we parse until we hit whitespace or a comma */
 			/* 'true' (potentially) */
+			log_error("TODO: true");
+			_assert(0);
 		} break;
 		case 'f':
 		{
+			/* TODO: this case will never be tested by the haversine input json */
 			/* 'false' (potentially) */
+			log_error("TODO: false");
+			_assert(0);
 		} break;
 		case 'n':
 		{
+			/* TODO: this case will never be tested by the haversine input json */
 			/* 'null' (potentially) */
+			log_error("TODO: null");
+			_assert(0);
 		} break;
 		case '0':
-		{
-			/* the number '0' */
-		} break;
 		case '1':
 		case '2':
 		case '3':
@@ -338,8 +445,29 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 		case '7':
 		case '8':
 		case '9':
+		case '-':
 		{
 			/* number */
+			log_trace("json_parse_value: parsing a number...");
+			result.type = JSON_VALUE_NUMBER;
+
+			u32 string_length = 0;
+			while(  (json_txt[*json_txt_offset + string_length] != ',') && 
+				(json_txt[*json_txt_offset + string_length] != '\n') &&
+				(json_txt[*json_txt_offset + string_length] != '\t') &&
+				(json_txt[*json_txt_offset + string_length] != '\r') &&
+				(json_txt[*json_txt_offset + string_length] != '}')  &&
+				(json_txt[*json_txt_offset + string_length] != ']')  &&
+				(json_txt[*json_txt_offset + string_length] != ' ')  )
+			{
+				string_length++;
+				_assert( ((*json_txt_offset) + string_length) < json_txt_size);
+			}
+
+			const char *string_start = json_txt + (*json_txt_offset);
+			result.number = jstring_chars_to_double(string_start, string_length);
+			(*json_txt_offset) += string_length; 
+			_assert(*json_txt_offset < json_txt_size);
 		} break;
 		default:
 		{
@@ -354,11 +482,6 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 
 u32 json_get_array_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	/* TODO: parse values until end of array */
-
-	/* TODO: this prepass code can I think be used for both array and object parsing, so put 
-	 * it in a function that returns value count
-	 */
 	u32 bracket_depth = 1; 
 	/* '[' .. since we got a bracket in the first place from it being 
 	 * an array 
@@ -376,8 +499,8 @@ u32 json_get_array_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_
 	/* once bracket_depth is 0 (i.e. we've found the closing bracket of the array, we know we 
 	 * reached the end 
 	 */
-	log_trace("json_parse_array: doing prepass to determine number of values in the array...");
 	prepass_json_txt_offset++; /* get past the '[' we started with */
+	_assert(prepass_json_txt_offset < json_txt_size);
 	while(bracket_depth != 0)
 	{
 		/* should just be # commas that aren't within values ? */
@@ -469,11 +592,6 @@ u32 json_get_array_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_
 			} break;
 		}
 
-		log_trace("\tprepass - char: '%c' | bracket depth: %u | brace depth: %u |"
-			  " in value? %u | in string? %u | value count: %u",
-			  json_txt[prepass_json_txt_offset], bracket_depth, brace_depth, in_value,
-			  in_string, value_count);
-
 		prepass_json_txt_offset++;
 		_assert(prepass_json_txt_offset < json_txt_size);
 	}
@@ -483,11 +601,6 @@ u32 json_get_array_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_
 
 u32 json_get_object_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	/* TODO: parse values until end of array */
-
-	/* TODO: this prepass code can I think be used for both array and object parsing, so put 
-	 * it in a function that returns value count
-	 */
 	u32 brace_depth = 1; 
 	/* '[' .. since we got a bracket in the first place from it being 
 	 * an array 
@@ -505,7 +618,6 @@ u32 json_get_object_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt
 	/* once bracket_depth is 0 (i.e. we've found the closing bracket of the array, we know we 
 	 * reached the end 
 	 */
-	log_trace("json_parse_array: doing prepass to determine number of values in the array...");
 	prepass_json_txt_offset++; /* get past the '[' we started with */
 	while(brace_depth != 0)
 	{
@@ -598,11 +710,6 @@ u32 json_get_object_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt
 			} break;
 		}
 
-		log_trace("\tprepass - char: '%c' | bracket depth: %u | brace depth: %u |"
-			  " in value? %u | in string? %u | value count: %u",
-			  json_txt[prepass_json_txt_offset], bracket_depth, brace_depth, in_value,
-			  in_string, value_count);
-
 		prepass_json_txt_offset++;
 		_assert(prepass_json_txt_offset < json_txt_size);
 	}
@@ -612,5 +719,62 @@ u32 json_get_object_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt
 
 void debug_print_json_value(json_value *value)
 {
-	log_error("debug_print_json_value:\n\n\tTODO");
+	switch(value->type)
+	{
+		case JSON_VALUE_OBJECT:
+		{
+			json_object obj = *(value->object);
+			printf("{\n");
+			u32 value_index = 0;
+			for( ; value_index < obj.values_count; value_index++)
+			{
+				printf("\"%s\":", obj.keys[value_index].data);
+				debug_print_json_value(&(obj.values[value_index]));
+				if(value_index != obj.values_count - 1)
+				{
+					printf(", ");
+				}
+			}
+			printf("}\n");
+		} break;
+		case JSON_VALUE_ARRAY:
+		{
+			json_array array = *(value->array);
+			printf("[\n");
+			u32 value_index = 0;
+			for( ; value_index < array.values_count; value_index++)
+			{
+				debug_print_json_value(&(array.values[value_index]));
+				if(value_index != array.values_count - 1)
+				{
+					printf(", ");
+				}
+			}
+			printf("]\n");
+		} break;
+		case JSON_VALUE_STRING:
+		{
+			printf("\"%s\"", value->string.data);
+		} break;
+		case JSON_VALUE_NUMBER:
+		{
+			printf("%.16lf", value->number);
+		} break;
+		case JSON_VALUE_TRUE:
+		{
+			printf("true");
+		} break;
+		case JSON_VALUE_FALSE:
+		{
+			printf("false");
+		} break;
+		case JSON_VALUE_NULL:
+		{
+			printf("null");
+		} break;
+		default:
+		{
+			_assert(0);
+		} break;
+	}
 }
