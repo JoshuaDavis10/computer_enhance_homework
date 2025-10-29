@@ -290,6 +290,7 @@ static u32 jstring_length(const char *string)
 	{
 		tmp++;
 		length++;
+		/* TODO: this 4096 is way too short */
 		JSTRING_ASSERT(length < 4096, "really long string");
 	}
 	return length;
@@ -1373,6 +1374,24 @@ static b32 jstring_replace_at_jstring(
  *		jstring_replace_raw_with_raw_all
  *		jstring_replace_jstring_with_jstring_all
  */
+
+/* NOTE(josh): pass 0 for limit to just go until you hit a null terminator */
+static b32 jstring_copy_chars(char *dest, char *src, u64 limit)
+{
+	u64 length = 0;
+	while(src[length] != '\0') 
+	{
+		dest[length] = src[length];
+		length++;
+
+		if(length >= limit && limit != 0)
+		{
+			break;
+		}
+	}
+	dest[length] = '\0';
+	return(true);
+}
 
 static b32 jstring_copy_to_buffer(
 		char *buffer, 

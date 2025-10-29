@@ -128,6 +128,8 @@ u32 json_parse(
 	json_value *json_values_out, 
 	u32 json_value_count_expected)
 {
+	TIME_FUNCTION_START(json_parse);
+
 	_assert(jstring_temporary_memory_info.activated);
 	_assert(jstring_temporary_memory_info.address);
 	_assert(jstring_temporary_memory_info.offset == 0);
@@ -207,6 +209,9 @@ u32 json_parse(
 	}
 
 	log_trace("json_parse: parse completed.");
+
+	TIME_FUNCTION_END(json_parse);
+
 	return(json_value_count);
 }
 
@@ -217,9 +222,6 @@ b32 json_parse_whitespace(char *json_txt, u64 json_txt_size, u64 *json_txt_offse
 	{
 		if(*json_txt_offset >= json_txt_size)
 		{
-			log_warn("json_parse_whitespace: cannot read from offset (%u), "
-					  "json text size is %u bytes.", 
-					  *json_txt_offset, json_txt_size);
 			return(true);
 		}
 

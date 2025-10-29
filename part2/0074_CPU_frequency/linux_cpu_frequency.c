@@ -18,6 +18,7 @@ static u64 read_os_timer()
  * but compiler might complain about the function not being used? 
  * TODO: update this comment if that occurs ^, then u can inline. just wanted to
  * see it happen for myself rather than just inlining like Casey did
+ * NOTE(josh): C89 can't inline anyways apparently
  */
 static u64 read_cpu_timer()
 {

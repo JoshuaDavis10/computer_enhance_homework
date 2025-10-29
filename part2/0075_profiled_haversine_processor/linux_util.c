@@ -8,7 +8,7 @@
 #define LOGGER_WARN_ENABLED 1
 #define LOGGER_INFO_ENABLED 1
 #define LOGGER_DEBUG_ENABLED 0
-#define LOGGER_TRACE_ENABLED 0
+#define LOGGER_TRACE_ENABLED 0 
 
 #if LOGGER_ERROR_ENABLED
 void log_error(const char *message, ...) {
@@ -145,10 +145,10 @@ static u64 read_cpu_frequency()
 
 	cpu_frequency = MICROSECS_PER_SEC * cpu_elapsed / os_elapsed;
 
-	log_info("os clock: %llu -> %llu = %llu elapsed", os_start, os_end, os_elapsed);
-	log_info("os seconds: %llu", os_elapsed / MICROSECS_PER_SEC);
-	log_info("cpu clock: %llu -> %llu = %llu elapsed", cpu_start, cpu_end, cpu_elapsed);
-	log_info("cpu frequency: %llu (guesstimate)", cpu_frequency);
+	log_trace("os clock: %llu -> %llu = %llu elapsed", os_start, os_end, os_elapsed);
+	log_trace("os seconds: %llu", os_elapsed / MICROSECS_PER_SEC);
+	log_trace("cpu clock: %llu -> %llu = %llu elapsed", cpu_start, cpu_end, cpu_elapsed);
+	log_trace("cpu frequency: %llu (guesstimate)", cpu_frequency);
 
 	return(cpu_frequency);
 }

@@ -23,131 +23,53 @@ typedef unsigned int b32;
 
 #include "jstring.h" 
 #include "linux_util.c" /* NOTE(josh): cpu frequency stuff is in here */
+#include "profiler.c" /* NOTE(josh): this needs stuff from linux_util.c, and jstring */
 #include "haversine_formula.c"
 #include "json_parse.c"
 
-typedef struct {
-	u64 cpu_frequency;
+u64 read_file(const char *filepath, char **output)
+{	
+	TIME_FUNCTION_START(read_file);
 
-	u64 startup_cycles;
-	u64 file_read_cycles;
-	u64 setup_cycles;
-	u64 parse_cycles;
-	u64 sum_cycles;
-	u64 check_cycles;
-
-	u64 total_cycles;
-} timing_profile_data;
-
-static timing_profile_data profile;
-
-int main(int argc, char **argv)
-{
-	profile.cpu_frequency = read_cpu_frequency();
-
-	u64 cpu_program_start = read_cpu_timer();
-	u64 cpu_start = read_cpu_timer();
-
-	i32 input_json_fd;
-	i32 input_answers_fd;
-	struct stat input_json_file_stat;
-	char *input_json_txt;
-	u64 input_json_file_size;
-	void *jstring_memory;
-
-	if(argc != 2 && argc != 3)
-	{
-		log_error("USAGE\n"
-			"./haversine_processor [input haversine json]\n"
-			"./haversine_processor [input haversine json] [input haversine answers]");
-		return(-1);
-	}
-
-	if(argc == 3)
-	{
-		if((input_answers_fd = open(argv[2], O_RDONLY)) == -1)
-		{
-			log_error("Failed to open file: %s (errno: %d). Terminating program.", 
-				argv[2], errno);
-			return(-1);
-		}
-	}
-
-	u64 cpu_end = read_cpu_timer();
-	profile.startup_cycles = cpu_end - cpu_start;
-	profile.total_cycles = profile.startup_cycles;
-	
-	cpu_start = read_cpu_timer();
-	if((input_json_fd = open(argv[1], O_RDONLY)) == -1)
+	struct stat file_stat;
+	i32 fd;
+	u64 file_size;
+	if((fd = open(filepath, O_RDONLY)) == -1)
 	{
 		log_error("Failed to open file: %s (errno: %d). Terminating program.", 
-			argv[1], errno);
-		return(-1);
+			filepath, errno);
+		return(0);
 	}
-	log_info("Input json file has been opened.");
 
-	if(stat(argv[1], &input_json_file_stat) == -1)
+	if(stat(filepath, &file_stat) == -1)
 	{
 		log_error("Failed to stat(2) file: %s (errno: %d). Terminating program.", 
-			argv[1], errno);
-		return(-1);
+			filepath, errno);
+		return(0);
 	}
-	log_info("Input json file has been stat'd.");
 
 	/* XXX: st_size is an off_t, which I think is unsigned lol, keep in mind */
-	_assert(input_json_file_stat.st_size >= 0);
-	input_json_file_size = input_json_file_stat.st_size;
-	log_debug("Input json file size: %u bytes", input_json_file_size);
+	_assert(file_stat.st_size >= 0);
+	file_size = file_stat.st_size;
+	log_debug("Input json file size: %u bytes", file_size);
 
-	input_json_txt = malloc(input_json_file_size+1); /* +1 for null terminator */
-	if(read(input_json_fd, input_json_txt, input_json_file_stat.st_size) == -1)
+	(*output) = malloc(file_size+1); /* +1 for null terminator */
+	if(read(fd, (*output), file_stat.st_size) == -1)
 	{
 		log_error("Failed to read(2) file: %s (errno: %d). Terminating program.", 
-			argv[1], errno);
-		return(-1);
+			filepath, errno);
+		return(0);
 	}
-	input_json_txt[input_json_file_size] = '\0';
-	log_info("Input json file contents have been read into a buffer.");
+	(*output)[file_size] = '\0';
 
-	cpu_end = read_cpu_timer();
-	profile.file_read_cycles = cpu_end - cpu_start;
-	profile.total_cycles += profile.file_read_cycles;
+	TIME_FUNCTION_END(read_file);
 
-	cpu_start = read_cpu_timer();
+	return(file_size);
+}
 
-	jstring_memory = malloc((input_json_file_size+1) * 2);
-	if(!jstring_load_logging_function(log_trace))
-	{
-		log_error("Failed to load jstring logging function. Terminating program.");
-		return(-1);
-	}
-	if(!jstring_memory_activate( ((input_json_file_size+1)*2), jstring_memory))
-	{
-		log_error("Failed to activate jstring memory. Terminating program.");
-		return(-1);
-	}
-
-	json_value *json_parse_result = malloc(sizeof(json_value));
-
-	cpu_end = read_cpu_timer();
-	profile.setup_cycles = cpu_end - cpu_start;
-	profile.total_cycles += profile.setup_cycles;
-
-	cpu_start = read_cpu_timer();
-
-	u32 json_parse_value_count = 
-		json_parse(input_json_txt, input_json_file_size, json_parse_result, 1);
-
-	cpu_end = read_cpu_timer();
-	profile.parse_cycles = cpu_end - cpu_start;
-	profile.total_cycles += profile.parse_cycles;
-
-	cpu_start = read_cpu_timer();
-
-	/* NOTE(josh): in our case, there's just gonna be one top-level .json object */
-	_assert(json_parse_value_count == 1);
-
-	/* debug_print_json_value(json_parse_result); */
+b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32 answers_fd)
+{
+	TIME_FUNCTION_START(compute_haversine_sums);
 
 	_assert(json_parse_result->type == JSON_VALUE_OBJECT);
 	_assert(json_parse_result->object->values_count == 1);
@@ -183,14 +105,14 @@ int main(int argc, char **argv)
 		log_trace("reference_haversine (x0:%.16lf, y0:%.16lf, x1:%.16lf, y1:%.16lf):"
 			 "\n\t%.16lf", x0, y0, x1, y1, reference_haversine_distance);
 
-		if(argc == 3)
+		if(check_answers)
 		{
 			f64 haversine_answer; 
-			if(read(input_answers_fd, &haversine_answer, sizeof(f64)) == -1)
+			if(read(answers_fd, &haversine_answer, sizeof(f64)) == -1)
 			{
-				log_error("Failed to read(2) file: %s (errno: %d). "
-					  "Terminating program.", argv[2], errno);
-				return(-1);
+				log_error("Failed to read(2) answers file. (errno: %d). "
+					  "Terminating program.", errno);
+				return(false);
 			}
 
 			f64 diff = haversine_answer - reference_haversine_distance;
@@ -207,60 +129,94 @@ int main(int argc, char **argv)
 		}
 	}
 
-	cpu_end = read_cpu_timer();
-	profile.sum_cycles = cpu_end - cpu_start;
-	profile.total_cycles += profile.sum_cycles;
-
-	cpu_start = read_cpu_timer();
-
-	if(argc == 3)
+	f64 haversine_average = haversine_accumulator / ((f64)haversine_points_count);
+	if(check_answers)
 	{
-		f64 haversine_average = haversine_accumulator / ((f64)haversine_points_count);
 		f64 haversine_average_answer;
-		if(read(input_answers_fd, &haversine_average_answer, sizeof(f64)) == -1)
+		if(read(answers_fd, &haversine_average_answer, sizeof(f64)) == -1)
 		{
-			log_error("Failed to read(2) file: %s (errno: %d). "
-				  "Terminating program.", argv[2], errno);
-			return(-1);
+			log_error("Failed to read(2) answers file. (errno: %d). "
+				  "Terminating program.", errno);
+			return(false);
 		}
 		f64 diff = haversine_average_answer - haversine_average;
 		if( (diff > 0.000000000001) || (diff < -0.000000000001) )
 		{
-			log_trace("\ncheck average against answer:\n\t%.16lf == %.16lf\n", 
+			log_error("check average against answer: %.16lf == %.16lf", 
 				haversine_average, haversine_average_answer);
 		}
 		else
 		{
-			log_trace("\ncheck average against answer:\n\t%.16lf == %.16lf\n", 
+			log_info("check average against answer: %.16lf == %.16lf", 
 				haversine_average, haversine_average_answer);
 		}
 	}
 
-	cpu_end = read_cpu_timer();
-	profile.check_cycles = cpu_end - cpu_start;
-	profile.total_cycles += profile.check_cycles;
+	TIME_FUNCTION_END(compute_haversine_sums);
 
-	u64 cpu_program_end = read_cpu_timer();
+	return(true);
+}
 
-	u64 total_time_ms = ((cpu_program_end - cpu_program_start) / (f64)profile.cpu_frequency) * 1000;
+int main(int argc, char **argv)
+{
+	if(!jstring_load_logging_function(log_warn))
+	{
+		log_error("Failed to load jstring logging function. Terminating program.");
+		return(-1);
+	}
 
-	log_info("profile info:");
-	log_info("\ttotal time: %llu ms | total cycles: %llu | estimate cpu frequency: %llu", 
-		  total_time_ms,
-		  profile.total_cycles, 
-		  profile.cpu_frequency);
-	log_info("\t\tstartup: %llu (%.2lf%%)", 
-		  profile.startup_cycles, profile.startup_cycles / (f64)profile.total_cycles * 100); 
-	log_info("\t\tread: %llu (%.2lf%%)", 
-		  profile.file_read_cycles, profile.file_read_cycles / (f64)profile.total_cycles * 100); 
-	log_info("\t\tmisc setup: %llu (%.2lf%%)", 
-		  profile.setup_cycles, profile.setup_cycles / (f64)profile.total_cycles * 100); 
-	log_info("\t\tparse: %llu (%.2lf%%)", 
-		  profile.parse_cycles, profile.parse_cycles / (f64)profile.total_cycles * 100); 
-	log_info("\t\tsum: %llu (%.2lf%%)", 
-		  profile.sum_cycles, profile.sum_cycles / (f64)profile.total_cycles * 100); 
-	log_info("\t\tcheck: %llu (%.2lf%%)", 
-		  profile.check_cycles, profile.check_cycles / (f64)profile.total_cycles * 100); 
+	timing_profiler_setup();
+
+	u64 input_json_file_size;
+	i32 input_answers_fd = 0;
+	char *input_json_txt;
+	void *jstring_memory;
+
+	if(argc != 2 && argc != 3)
+	{
+		log_error("USAGE\n"
+			"./haversine_processor [input haversine json]\n"
+			"./haversine_processor [input haversine json] [input haversine answers]");
+		return(-1);
+	}
+
+	if(argc == 3)
+	{
+		if((input_answers_fd = open(argv[2], O_RDONLY)) == -1)
+		{
+			log_error("Failed to open file: %s (errno: %d). Terminating program.", 
+				argv[2], errno);
+			return(-1);
+		}
+	}
+
+	input_json_file_size = read_file(argv[1], &input_json_txt);
+	if(!input_json_file_size)
+	{
+		return(-1);
+	}
+
+	jstring_memory = malloc((input_json_file_size+1) * 2);
+	if(!jstring_memory_activate( ((input_json_file_size+1)*2), jstring_memory))
+	{
+		log_error("Failed to activate jstring memory. Terminating program.");
+		return(-1);
+	}
+
+	json_value *json_parse_result = malloc(sizeof(json_value));
+
+	u32 json_parse_value_count = 
+		json_parse(input_json_txt, input_json_file_size, json_parse_result, 1);
+
+	/* NOTE(josh): in our case, there's just gonna be one top-level .json object */
+	_assert(json_parse_value_count == 1);
+
+	/* debug_print_json_value(json_parse_result); */
+
+	if(!compute_haversine_sums(json_parse_result, true, input_answers_fd))
+	{
+		return(-1);
+	}
 
 	json_memory_clear();
 	log_trace("freeing stuff that was malloc'd in main() --"
@@ -269,7 +225,8 @@ int main(int argc, char **argv)
 	free(jstring_memory);
 	free(json_parse_result);
 
-	log_info("\nall done.\n");
+	timing_profiler_finish();
+	timing_profiler_print_info();
 
 	return(0);
 }
