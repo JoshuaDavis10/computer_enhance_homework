@@ -8,7 +8,7 @@
 #define LOGGER_WARN_ENABLED 1
 #define LOGGER_INFO_ENABLED 1
 #define LOGGER_DEBUG_ENABLED 1
-#define LOGGER_TRACE_ENABLED 0
+#define LOGGER_TRACE_ENABLED 1
 
 #if LOGGER_ERROR_ENABLED
 void log_error(const char *message, ...) {
