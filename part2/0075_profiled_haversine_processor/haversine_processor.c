@@ -30,7 +30,6 @@ typedef unsigned int b32;
 u64 read_file(const char *filepath, char **output)
 {	
 	PROFILER_START_TIMING_BLOCK;
-	u32 temp_actual_start = read_cpu_timer();
 	struct stat file_stat;
 	i32 fd;
 	u64 file_size;
@@ -62,8 +61,6 @@ u64 read_file(const char *filepath, char **output)
 	}
 	(*output)[file_size] = '\0';
 
-	u32 temp_actual_end = read_cpu_timer();
-	log_info("read file: %llu tsc's", temp_actual_end - temp_actual_start); 
 	PROFILER_FINISH_TIMING_BLOCK;
 	return(file_size);
 }
@@ -71,7 +68,6 @@ u64 read_file(const char *filepath, char **output)
 b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32 answers_fd)
 {
 	PROFILER_START_TIMING_BLOCK;
-	u32 temp_actual_start = read_cpu_timer();
 	_assert(json_parse_result->type == JSON_VALUE_OBJECT);
 	_assert(json_parse_result->object->values_count == 1);
 	_assert(json_parse_result->object->values[0].type == JSON_VALUE_ARRAY);
@@ -153,8 +149,6 @@ b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32
 		}
 	}
 
-	u32 temp_actual_end = read_cpu_timer();
-	log_info("haversine compute: %llu tsc's", temp_actual_end - temp_actual_start); 
 	PROFILER_FINISH_TIMING_BLOCK;
 	return(true);
 }
@@ -192,10 +186,8 @@ int main(int argc, char **argv)
 		}
 	}
 
-	u64 temp_actual_start = read_cpu_timer();
 	input_json_file_size = read_file(argv[1], &input_json_txt);
-	u64 temp_actual_end = read_cpu_timer();
-	log_info("outer read file: %llu tsc's", temp_actual_end - temp_actual_start);
+
 	if(!input_json_file_size)
 	{
 		return(-1);
@@ -210,11 +202,8 @@ int main(int argc, char **argv)
 
 	json_value *json_parse_result = malloc(sizeof(json_value));
 
-	temp_actual_start = read_cpu_timer();
 	u32 json_parse_value_count = 
 		json_parse(input_json_txt, input_json_file_size, json_parse_result, 1);
-	temp_actual_end = read_cpu_timer();
-	log_info("outer json parse: %llu tsc's", temp_actual_end - temp_actual_start);
 
 	/* NOTE(josh): in our case, there's just gonna be one top-level .json object */
 	_assert(json_parse_value_count == 1);
@@ -227,13 +216,10 @@ int main(int argc, char **argv)
 		argc_3 = true;
 	}
 
-	temp_actual_start = read_cpu_timer();
 	if(!compute_haversine_sums(json_parse_result, argc_3, input_answers_fd))
 	{
 		return(-1);
 	}
-	temp_actual_end = read_cpu_timer();
-	log_info("outer compute haversine: %llu tsc's", temp_actual_end - temp_actual_start);
 
 	finish_and_print_profile(log_info);
 

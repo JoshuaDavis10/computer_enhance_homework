@@ -129,8 +129,6 @@ u32 json_parse(
 	u32 json_value_count_expected)
 {
 	PROFILER_START_TIMING_BLOCK;
-	u32 temp_actual_start = read_cpu_timer();
-	log_debug("JSON PARSE START");
 	_assert(jstring_temporary_memory_info.activated);
 	_assert(jstring_temporary_memory_info.address);
 	_assert(jstring_temporary_memory_info.offset == 0);
@@ -209,10 +207,6 @@ u32 json_parse(
 		}
 	}
 
-	log_info("json_parse: parse completed.");
-
-	u32 temp_actual_end = read_cpu_timer();
-	log_info("json parse: %llu tsc's", temp_actual_end - temp_actual_start); 
 	PROFILER_FINISH_TIMING_BLOCK;
 	return(json_value_count);
 }

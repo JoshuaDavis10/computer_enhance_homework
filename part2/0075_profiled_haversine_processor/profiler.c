@@ -39,9 +39,9 @@ CONCAT(block_, __func__).unit_index = __COUNTER__; \
 #define PROFILER_FINISH_TIMING_BLOCK \
 { \
 	/* NOTE(josh): __func__ is C99 but seems to work with gcc -std=c89 fine */ \
-	u32 temp_tsc_end = read_cpu_timer(); \
-	u32 temp_unit_index = CONCAT(block_, __func__).unit_index; \
-	u32 temp_tsc_start  = CONCAT(block_, __func__).tsc_start; \
+	u64 temp_tsc_end = read_cpu_timer(); \
+	u64 temp_unit_index = CONCAT(block_, __func__).unit_index; \
+	u64 temp_tsc_start  = CONCAT(block_, __func__).tsc_start; \
 	global_profiler.units[temp_unit_index].hits++; \
 	global_profiler.units[temp_unit_index].tsc_elapsed += (temp_tsc_end - temp_tsc_start); \
 	global_profiler.units[temp_unit_index].name = __func__; \
