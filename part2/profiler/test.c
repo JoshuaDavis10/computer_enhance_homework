@@ -19,46 +19,50 @@ typedef float f32;
 #include "linux_util.c"
 #include "profiler.c"
 
-static u32 global_cunk_cannon = 0;
-static u32 global_foo_cannon = 0;
-static u32 global_bar_cannon = 0;
+static u64 global_cunk_cannon = 0;
+
+void foo();
+void bar();
 
 void cunk()
 {
 	PROFILER_START_TIMING_BLOCK; 
-	global_cunk_cannon++;
+	u32 i = 0;
+	for( ; i < 100; i++)
+	{
+		foo();
+	}
 	PROFILER_FINISH_TIMING_BLOCK;
 }
 
 void foo()
 {
 	PROFILER_START_TIMING_BLOCK;
-	cunk();
-	cunk();
-	cunk();
-	global_foo_cannon++;
+	u32 i = 0;
+	for( ; i < 100; i++)
+	{
+		bar();
+	}
 	PROFILER_FINISH_TIMING_BLOCK;
 }
 
 void bar()
 {
 	PROFILER_START_TIMING_BLOCK;
-	cunk();
-	cunk();
-	cunk();
-	global_bar_cannon++;
+	u32 i = 0;
+	for( ; i < 100; i++)
+	{
+		global_cunk_cannon++;
+	}
 	PROFILER_FINISH_TIMING_BLOCK;
 }
 
 int main()
 {
 	start_profile();
-	PROFILER_START_TIMING_BLOCK;
 
-	bar();
-	foo();
+	cunk();
 
-	PROFILER_FINISH_TIMING_BLOCK;
 	finish_and_print_profile(log_debug);
 
 	return(0);

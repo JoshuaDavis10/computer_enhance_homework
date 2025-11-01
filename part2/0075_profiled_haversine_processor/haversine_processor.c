@@ -77,6 +77,7 @@ b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32
 	u32 haversine_points_index = 0;
 	f64 x0, y0, x1, y1;
 	f64 haversine_accumulator = 0.0;
+	u32 incorrect_haversine_distance_count = 0;
 	for( ; haversine_points_index < haversine_points_count; haversine_points_index++)
 	{
 		_assert(haversine_points_list[haversine_points_index].type == JSON_VALUE_OBJECT);
@@ -99,9 +100,6 @@ b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32
 
 		haversine_accumulator+=reference_haversine_distance;
 
-		log_trace("reference_haversine (x0:%.16lf, y0:%.16lf, x1:%.16lf, y1:%.16lf):"
-			 "\n\t%.16lf", x0, y0, x1, y1, reference_haversine_distance);
-
 		if(check_answers)
 		{
 			f64 haversine_answer; 
@@ -113,17 +111,17 @@ b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32
 			}
 
 			f64 diff = haversine_answer - reference_haversine_distance;
+
 			if( (diff > 0.000000000001) || (diff < -0.000000000001) )
 			{
-				log_trace("check against answer:\n\t%.16lf == %.16lf", 
-					reference_haversine_distance, haversine_answer);
-			}
-			else
-			{
-				log_trace("check against answer:\n\t%.16lf == %.16lf", 
-					reference_haversine_distance, haversine_answer);
+				incorrect_haversine_distance_count++;
 			}
 		}
+	}
+	if(incorrect_haversine_distance_count)
+	{
+		log_error("%u of %u haversine distances were incorrect",
+			incorrect_haversine_distance_count, haversine_points_count);
 	}
 
 	f64 haversine_average = haversine_accumulator / ((f64)haversine_points_count);
@@ -139,7 +137,7 @@ b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32
 		f64 diff = haversine_average_answer - haversine_average;
 		if( (diff > 0.000000000001) || (diff < -0.000000000001) )
 		{
-			log_error("check average against answer: %.16lf == %.16lf", 
+			log_error("check average against answer: %.16lf != %.16lf", 
 				haversine_average, haversine_average_answer);
 		}
 		else

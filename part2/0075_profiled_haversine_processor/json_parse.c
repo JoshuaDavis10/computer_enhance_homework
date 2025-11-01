@@ -77,8 +77,6 @@ void *json_memory_allocate(u64 size)
 		 */
 		while(json_memory_offset + size > json_memory_size)
 		{
-			log_trace("json_memory_allocate: realloc'ing to %u bytes", 
-				json_memory_size*2);
 			void *tmp = json_memory;
 			json_memory = realloc(json_memory, json_memory_size * 2);
 			_assert(json_memory == tmp);
@@ -87,9 +85,6 @@ void *json_memory_allocate(u64 size)
 	}
 	void *return_address = ((char*)json_memory + json_memory_offset);
 	json_memory_offset+=size;
-	log_trace("json_memory_allocate: allocated %u bytes @%p", size, return_address); 
-	log_trace("json_memory_allocate: total allocated: %u bytes", json_memory_size);
-	log_trace("json_memory_allocate: total used     : %u bytes", json_memory_offset);
 	return(return_address); 
 }
 
@@ -120,8 +115,6 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
  * returns number of json values in the .json text
  */
 
-/* NOTE: TO SELF THROW log_traces's EVERYWHERE */
-/* NOTE: TO SELF there's a null terminator at the end of json_txt @index json_txt_size*/
 u32 json_parse(
 	char *json_txt, 
 	u64 json_txt_size, 
@@ -213,6 +206,7 @@ u32 json_parse(
 
 b32 json_parse_whitespace(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
+	PROFILER_START_TIMING_BLOCK;
 	b32 test;
 	while(1)
 	{
@@ -234,11 +228,13 @@ b32 json_parse_whitespace(char *json_txt, u64 json_txt_size, u64 *json_txt_offse
 
 		(*json_txt_offset)++;
 	}
+	PROFILER_FINISH_TIMING_BLOCK;
 	return(true);
 }
 
 json_object *json_parse_object(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
+	PROFILER_START_TIMING_BLOCK;
 	_assert(json_txt[*json_txt_offset] == '{');
 	json_object *result = (json_object *)json_memory_allocate(sizeof(json_object));
 	_assert(result);
@@ -313,11 +309,13 @@ json_object *json_parse_object(char *json_txt, u64 json_txt_size, u64 *json_txt_
 	(*json_txt_offset)++;
 	_assert(*json_txt_offset < json_txt_size);
 
+	PROFILER_FINISH_TIMING_BLOCK;
 	return(result);
 }
 
 json_array *json_parse_array(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
+	PROFILER_START_TIMING_BLOCK;
 	_assert(json_txt[*json_txt_offset] == '[');
 	json_array *result = (json_array *)json_memory_allocate(sizeof(json_array));
 	_assert(result);
@@ -366,11 +364,13 @@ json_array *json_parse_array(char *json_txt, u64 json_txt_size, u64 *json_txt_of
 	(*json_txt_offset)++;
 	_assert(*json_txt_offset < json_txt_size);
 
+	PROFILER_FINISH_TIMING_BLOCK;
 	return(result);
 }
 
 json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
+	PROFILER_START_TIMING_BLOCK;
 	json_value result;
 	/* NOTE: no whitespace to trim since caller would have done that already */
 
@@ -379,7 +379,6 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 		case '{':
 		{
 			/* object */
-			log_trace("json_parse_value: parsing an object...");
 			result.type = JSON_VALUE_OBJECT;
 			result.object = 
 				json_parse_object(json_txt, json_txt_size, json_txt_offset);
@@ -387,7 +386,6 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 		case '[':
 		{
 			/* array */
-			log_trace("json_parse_value: parsing an array...");
 			result.type = JSON_VALUE_ARRAY;
 			result.array = 
 				json_parse_array(json_txt, json_txt_size, json_txt_offset);
@@ -396,7 +394,6 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 		{
 			/* TODO: this case will never be tested by the haversine input json */
 			/* string */
-			log_trace("json_parse_value: parsing a string...");
 			result.type = JSON_VALUE_STRING;
 			u32 string_length = 0;
 			while(json_txt[*json_txt_offset + string_length] != '"')
@@ -446,7 +443,6 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 		case '-':
 		{
 			/* number */
-			log_trace("json_parse_value: parsing a number...");
 			result.type = JSON_VALUE_NUMBER;
 
 			u32 string_length = 0;
@@ -475,11 +471,13 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 		} break;
 	}
 
+	PROFILER_FINISH_TIMING_BLOCK;
 	return(result);
 }
 
 u32 json_get_array_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
+	PROFILER_START_TIMING_BLOCK;
 	u32 bracket_depth = 1; 
 	/* '[' .. since we got a bracket in the first place from it being 
 	 * an array 
@@ -594,11 +592,13 @@ u32 json_get_array_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_
 		_assert(prepass_json_txt_offset < json_txt_size);
 	}
 
+	PROFILER_FINISH_TIMING_BLOCK;
 	return(value_count);
 }
 
 u32 json_get_object_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
+	PROFILER_START_TIMING_BLOCK;
 	u32 brace_depth = 1; 
 	/* '[' .. since we got a bracket in the first place from it being 
 	 * an array 
@@ -712,6 +712,7 @@ u32 json_get_object_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt
 		_assert(prepass_json_txt_offset < json_txt_size);
 	}
 
+	PROFILER_FINISH_TIMING_BLOCK;
 	return(value_count);
 }
 
