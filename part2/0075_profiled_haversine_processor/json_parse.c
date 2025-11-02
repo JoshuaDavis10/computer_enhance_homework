@@ -212,6 +212,7 @@ b32 json_parse_whitespace(char *json_txt, u64 json_txt_size, u64 *json_txt_offse
 	{
 		if(*json_txt_offset >= json_txt_size)
 		{
+			PROFILER_FINISH_TIMING_BLOCK;
 			return(true);
 		}
 

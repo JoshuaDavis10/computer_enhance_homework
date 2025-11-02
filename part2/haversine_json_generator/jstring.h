@@ -516,20 +516,38 @@ static b32 jstring_ends_with(jstring string, const char *chars)
 }
 
 /* NOTE: if digits is 0, we just make the number normal, so no zero padding */
-static jstring jstring_create_integer(i64 number, u32 digits)
+/* TODO: you should really re-write jstring_create_integer/jstring_create_double now that
+ * you've used them in json parsing and know the vibes. this stuff is mostly just hacked
+ * XXX: neg_zero_flag is so scuffed lol
+ */
+static jstring jstring_create_integer(i64 number, u32 digits, b32 neg_zero_flag)
 {
 	char *tmp;
 	jstring return_string;
 
 	if(number == 0)
 	{
-		tmp = jstring_temporary_memory_allocate_string(2 * (1 + 1));
-		tmp[0] = '0';
-		tmp[1] = '\0';
-		return_string.data = tmp;
-		return_string.length = 1;
-		return_string.capacity = 2 * (return_string.length + 1);
-		jstring_log("jstring_create_integer: integer string -> %s", return_string.data);
+		if(neg_zero_flag)
+		{
+			tmp = jstring_temporary_memory_allocate_string(2 * (2 + 1));
+			tmp[0] = '-';
+			tmp[1] = '0';
+			tmp[2] = '\0';
+			return_string.data = tmp;
+			return_string.length = 2;
+			return_string.capacity = 2 * (return_string.length + 1);
+			jstring_log("jstring_create_integer: integer string -> %s", return_string.data);
+		}
+		else
+		{
+			tmp = jstring_temporary_memory_allocate_string(2 * (1 + 1));
+			tmp[0] = '0';
+			tmp[1] = '\0';
+			return_string.data = tmp;
+			return_string.length = 1;
+			return_string.capacity = 2 * (return_string.length + 1);
+			jstring_log("jstring_create_integer: integer string -> %s", return_string.data);
+		}
 		return return_string;
 	}
 	
@@ -635,7 +653,15 @@ static jstring jstring_create_double(f64 number, u32 precision)
 	{
 		fractional_part = -fractional_part;
 	}
-	jstring integer_part_string = jstring_create_integer(integer_part, 0);
+	jstring integer_part_string;
+	if(number < 0.0)
+	{
+		integer_part_string = jstring_create_integer(integer_part, 0, true);
+	}
+	else
+	{
+		integer_part_string = jstring_create_integer(integer_part, 0, false);
+	}
 
 	if(precision != 0)
 	{
@@ -648,7 +674,7 @@ static jstring jstring_create_double(f64 number, u32 precision)
 		}
 	}
 	u64 temp_integer_frac = (u64)fractional_part;
-	jstring fractional_part_string = jstring_create_integer((i64)fractional_part, precision);
+	jstring fractional_part_string = jstring_create_integer((i64)fractional_part, precision, false);
 	u32 frac_part_length = fractional_part_string.length;
 	for( ; frac_part_length < precision; frac_part_length++)
 	{

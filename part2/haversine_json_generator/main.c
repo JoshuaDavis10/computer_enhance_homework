@@ -31,9 +31,7 @@ static f64 haversine_distance_accumulator = 0.0;
 /* NOTE(josh): will return a float between -range and range */
 f64 get_random_double(f64 range)
 {
-	log_debug("getting random double...");
 	f64 result = ( ( ((f64)rand())/RAND_MAX ) * (2*range) ) - range;
-	log_debug("got random double.");
 	return result;
 }
 
@@ -105,13 +103,11 @@ int main(int argc, char **argv)
 		f64 x1 = get_random_double(180.0);
 		f64 y1 = get_random_double(90.0);
 
-		log_debug("\nx0: %.16lf\ny0: %.16lf\nx1: %.16lf\ny1: %.16lf", x0, y0, x1, y1);
+	/*	log_debug("[%u] x0: %.16lf, y0: %.16lf, x1: %.16lf, y1: %.16lf", point_pairs_index, x0, y0, x1, y1); */
 
 		/* calculate distance and store in answers file/accumulator */
 		/* NOTE(josh): 6372.8 is the earth radius value casey uses */
 		f64 reference_calculation = reference_haversine(x0, y0, x1, y1, 6372.8);
-		log_debug("reference haversine -> %.16lf", reference_calculation);
-		log_debug("reference haversine -> %.16x", reference_calculation);
 		haversine_distance_accumulator += reference_calculation;
 		write(haversine_answers_fd, &reference_calculation, 8);
 
@@ -192,9 +188,6 @@ int main(int argc, char **argv)
 	write(haversine_input_json_fd, json_end_string.data, json_end_string.length);
 	f64 haversine_average = haversine_distance_accumulator / ((f64)point_pairs_count);
 	write(haversine_answers_fd, &haversine_average, 8);
-	log_debug("haversine average: %.16lf", haversine_average);
-	log_debug("haversine average: %.16x", haversine_average);
-
 
 	if(close(haversine_input_json_fd) == -1)
 	{
@@ -209,7 +202,6 @@ int main(int argc, char **argv)
 	free(jstring_memory);
 
 	f64 test_float = 0x40ad7aeef7ea0e65;
-	log_debug("0e65 f7ea 7aee 40ad as float -> %.16lf", test_float); 
 
 	return(0);
 }

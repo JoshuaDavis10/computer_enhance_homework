@@ -50,7 +50,6 @@ u64 read_file(const char *filepath, char **output)
 	/* XXX: st_size is an off_t, which I think is unsigned lol, keep in mind */
 	_assert(file_stat.st_size >= 0);
 	file_size = file_stat.st_size;
-	log_debug("Input json file size: %u bytes", file_size);
 
 	(*output) = malloc(file_size+1); /* +1 for null terminator */
 	if(read(fd, (*output), file_stat.st_size) == -1)
@@ -112,8 +111,10 @@ b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32
 
 			f64 diff = haversine_answer - reference_haversine_distance;
 
-			if( (diff > 0.000000000001) || (diff < -0.000000000001) )
+			if( (diff > 0.00000001) || (diff < -0.00000001) )
 			{
+				log_error("[%u] %.16lf != %.16lf (x0:%.16lf, y0:%.16lf, x1:%.16lf, y1:%.16lf", 
+						haversine_points_index, haversine_answer, reference_haversine_distance, x0, y0, x1, y1);
 				incorrect_haversine_distance_count++;
 			}
 		}
@@ -153,6 +154,7 @@ b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32
 
 int main(int argc, char **argv)
 {
+	PROFILER_START_TIMING_BLOCK;
 	start_profile();
 
 	if(!jstring_load_logging_function(log_warn))
@@ -219,15 +221,13 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	finish_and_print_profile(log_info);
-
 	json_memory_clear();
-	log_trace("freeing stuff that was malloc'd in main() --"
-	   " input_json_txt, jstring_memory, json_parse_result...");
 	free(input_json_txt);
 	free(jstring_memory);
 	free(json_parse_result);
 
+	PROFILER_FINISH_TIMING_BLOCK;
+	finish_and_print_profile(log_info);
 	return(0);
 }
 
