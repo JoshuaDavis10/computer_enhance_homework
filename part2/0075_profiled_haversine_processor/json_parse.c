@@ -121,7 +121,7 @@ u32 json_parse(
 	json_value *json_values_out, 
 	u32 json_value_count_expected)
 {
-	PROFILER_START_TIMING_BLOCK;
+	PROFILER_START_TIMING_BLOCK(json_parse);
 	_assert(jstring_temporary_memory_info.activated);
 	_assert(jstring_temporary_memory_info.address);
 	_assert(jstring_temporary_memory_info.offset == 0);
@@ -150,6 +150,7 @@ u32 json_parse(
 	{
 		if(json_txt[json_txt_offset] == '{')
 		{
+			PROFILER_START_TIMING_BLOCK(json_parse_object);
 			if(json_value_count + 1 > json_value_count_expected)
 			{
 				log_error("json_parse: caller expected %u json values, "
@@ -166,6 +167,7 @@ u32 json_parse(
 			json_values_out[json_value_count].type = JSON_VALUE_OBJECT;
 			json_values_out[json_value_count].object = tmp;
 			json_value_count++;
+			PROFILER_FINISH_TIMING_BLOCK(json_parse_object);
 		}
 		else if(json_txt[json_txt_offset] == '[')
 		{
@@ -200,19 +202,17 @@ u32 json_parse(
 		}
 	}
 
-	PROFILER_FINISH_TIMING_BLOCK;
+	PROFILER_FINISH_TIMING_BLOCK(json_parse);
 	return(json_value_count);
 }
 
 b32 json_parse_whitespace(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	PROFILER_START_TIMING_BLOCK;
 	b32 test;
 	while(1)
 	{
 		if(*json_txt_offset >= json_txt_size)
 		{
-			PROFILER_FINISH_TIMING_BLOCK;
 			return(true);
 		}
 
@@ -229,13 +229,11 @@ b32 json_parse_whitespace(char *json_txt, u64 json_txt_size, u64 *json_txt_offse
 
 		(*json_txt_offset)++;
 	}
-	PROFILER_FINISH_TIMING_BLOCK;
 	return(true);
 }
 
 json_object *json_parse_object(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	PROFILER_START_TIMING_BLOCK;
 	_assert(json_txt[*json_txt_offset] == '{');
 	json_object *result = (json_object *)json_memory_allocate(sizeof(json_object));
 	_assert(result);
@@ -310,13 +308,12 @@ json_object *json_parse_object(char *json_txt, u64 json_txt_size, u64 *json_txt_
 	(*json_txt_offset)++;
 	_assert(*json_txt_offset < json_txt_size);
 
-	PROFILER_FINISH_TIMING_BLOCK;
 	return(result);
 }
 
 json_array *json_parse_array(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	PROFILER_START_TIMING_BLOCK;
+	PROFILER_START_TIMING_BLOCK(json_parse_array);
 	_assert(json_txt[*json_txt_offset] == '[');
 	json_array *result = (json_array *)json_memory_allocate(sizeof(json_array));
 	_assert(result);
@@ -365,13 +362,12 @@ json_array *json_parse_array(char *json_txt, u64 json_txt_size, u64 *json_txt_of
 	(*json_txt_offset)++;
 	_assert(*json_txt_offset < json_txt_size);
 
-	PROFILER_FINISH_TIMING_BLOCK;
+	PROFILER_FINISH_TIMING_BLOCK(json_parse_array);
 	return(result);
 }
 
 json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	PROFILER_START_TIMING_BLOCK;
 	json_value result;
 	/* NOTE: no whitespace to trim since caller would have done that already */
 
@@ -472,13 +468,11 @@ json_value json_parse_value(char *json_txt, u64 json_txt_size, u64 *json_txt_off
 		} break;
 	}
 
-	PROFILER_FINISH_TIMING_BLOCK;
 	return(result);
 }
 
 u32 json_get_array_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	PROFILER_START_TIMING_BLOCK;
 	u32 bracket_depth = 1; 
 	/* '[' .. since we got a bracket in the first place from it being 
 	 * an array 
@@ -593,13 +587,11 @@ u32 json_get_array_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_
 		_assert(prepass_json_txt_offset < json_txt_size);
 	}
 
-	PROFILER_FINISH_TIMING_BLOCK;
 	return(value_count);
 }
 
 u32 json_get_object_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt_offset)
 {
-	PROFILER_START_TIMING_BLOCK;
 	u32 brace_depth = 1; 
 	/* '[' .. since we got a bracket in the first place from it being 
 	 * an array 
@@ -713,7 +705,6 @@ u32 json_get_object_value_count(char *json_txt, u64 json_txt_size, u64 *json_txt
 		_assert(prepass_json_txt_offset < json_txt_size);
 	}
 
-	PROFILER_FINISH_TIMING_BLOCK;
 	return(value_count);
 }
 

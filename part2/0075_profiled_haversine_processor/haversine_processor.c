@@ -29,7 +29,7 @@ typedef unsigned int b32;
 
 u64 read_file(const char *filepath, char **output)
 {	
-	PROFILER_START_TIMING_BLOCK;
+	PROFILER_START_TIMING_BLOCK(read_file);
 	struct stat file_stat;
 	i32 fd;
 	u64 file_size;
@@ -60,13 +60,13 @@ u64 read_file(const char *filepath, char **output)
 	}
 	(*output)[file_size] = '\0';
 
-	PROFILER_FINISH_TIMING_BLOCK;
+	PROFILER_FINISH_TIMING_BLOCK(read_file);
 	return(file_size);
 }
 
 b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32 answers_fd)
 {
-	PROFILER_START_TIMING_BLOCK;
+	PROFILER_START_TIMING_BLOCK(compute_haversine_sums);
 	_assert(json_parse_result->type == JSON_VALUE_OBJECT);
 	_assert(json_parse_result->object->values_count == 1);
 	_assert(json_parse_result->object->values[0].type == JSON_VALUE_ARRAY);
@@ -148,13 +148,12 @@ b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32
 		}
 	}
 
-	PROFILER_FINISH_TIMING_BLOCK;
+	PROFILER_FINISH_TIMING_BLOCK(compute_haversine_sums);
 	return(true);
 }
 
 int main(int argc, char **argv)
 {
-	PROFILER_START_TIMING_BLOCK;
 	start_profile();
 
 	if(!jstring_load_logging_function(log_warn))
@@ -226,9 +225,8 @@ int main(int argc, char **argv)
 	free(jstring_memory);
 	free(json_parse_result);
 
-	PROFILER_FINISH_TIMING_BLOCK;
 	finish_and_print_profile(log_info);
 	return(0);
 }
 
-_static_assert(__COUNTER__ < PROFILER_UNIT_COUNT, counter_went_past_profiler_unit_count);
+PROFILER_END;
