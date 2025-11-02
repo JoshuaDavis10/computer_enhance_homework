@@ -15,7 +15,7 @@ typedef struct {
 
 typedef struct {
 	u64 tsc_start;
-	u64 temp_tsc_inclusive;
+	u64 unit_tsc_inclusive;
 	u32 unit_index;
 	u32 parent_unit_index;
 } profiler_block;
@@ -28,27 +28,35 @@ static u32 global_parent_unit_index = 0;
 #define PROFILER_START_TIMING_BLOCK \
 /* NOTE(josh): __COUNTER__ is not in C standard but seems to work with gcc -std=c89 fine */ \
 profiler_block CONCAT(profiler_block_, __func__); \
-CONCAT(profiler_block_, __func__).tsc_start = read_cpu_timer(); \
-CONCAT(profiler_block_, __func__).unit_index = __COUNTER__ + 1; \
-CONCAT(profiler_block_, __func__).temp_tsc_inclusive = \
-	global_profiler.units[CONCAT(profiler_block_, __func__).unit_index].tsc_elapsed_inclusive; \
-CONCAT(profiler_block_, __func__).parent_unit_index = global_parent_unit_index; \
-global_parent_unit_index = CONCAT(profiler_block_, __func__).unit_index; 
+{ \
+	CONCAT(profiler_block_, __func__).tsc_start = read_cpu_timer(); \
+	CONCAT(profiler_block_, __func__).unit_index = __COUNTER__ + 1; \
+\
+	u32 temp_unit_index = CONCAT(profiler_block_, __func__).unit_index; \
+\
+	CONCAT(profiler_block_, __func__).unit_tsc_inclusive = \
+		global_profiler.units[temp_unit_index].tsc_elapsed_inclusive; \
+	CONCAT(profiler_block_, __func__).parent_unit_index = global_parent_unit_index; \
+\
+	global_parent_unit_index = temp_unit_index; \
+}
 
 #define PROFILER_FINISH_TIMING_BLOCK \
 { \
 	/* NOTE(josh): __func__ is C99 but seems to work with gcc -std=c89 fine */ \
 	u64 temp_tsc_end = read_cpu_timer(); \
-	u64 temp_unit_index = CONCAT(profiler_block_, __func__).unit_index; \
 	u64 temp_tsc_start  = CONCAT(profiler_block_, __func__).tsc_start; \
+	u64 temp_unit_index = CONCAT(profiler_block_, __func__).unit_index; \
+	u64 temp_parent_unit_index = CONCAT(profiler_block_, __func__).parent_unit_index; \
 \
 	global_profiler.units[temp_unit_index].name = __func__; \
 	global_profiler.units[temp_unit_index].hits++; \
 	global_profiler.units[temp_unit_index].tsc_elapsed_exclusive += (temp_tsc_end - temp_tsc_start); \
-	global_profiler.units[CONCAT(profiler_block_, __func__).parent_unit_index].tsc_elapsed_exclusive \
-		-= (temp_tsc_end - temp_tsc_start); \
 	global_profiler.units[temp_unit_index].tsc_elapsed_inclusive = \
-		CONCAT(profiler_block_, __func__).temp_tsc_inclusive + (temp_tsc_end - temp_tsc_start); \
+		CONCAT(profiler_block_, __func__).unit_tsc_inclusive + (temp_tsc_end - temp_tsc_start); \
+\
+	global_profiler.units[temp_parent_unit_index].tsc_elapsed_exclusive \
+		-= (temp_tsc_end - temp_tsc_start); \
 \
 	global_parent_unit_index = CONCAT(profiler_block_, __func__).parent_unit_index; \
 }
