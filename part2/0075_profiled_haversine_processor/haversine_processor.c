@@ -29,7 +29,6 @@ typedef unsigned int b32;
 
 u64 read_file(const char *filepath, char **output)
 {	
-	PROFILER_START_TIMING_BLOCK(read_file);
 	struct stat file_stat;
 	i32 fd;
 	u64 file_size;
@@ -50,6 +49,7 @@ u64 read_file(const char *filepath, char **output)
 	/* XXX: st_size is an off_t, which I think is unsigned lol, keep in mind */
 	_assert(file_stat.st_size >= 0);
 	file_size = file_stat.st_size;
+	PROFILER_START_TIMING_BANDWIDTH(read_file, file_size);
 
 	(*output) = malloc(file_size+1); /* +1 for null terminator */
 	if(read(fd, (*output), file_stat.st_size) == -1)
@@ -66,13 +66,14 @@ u64 read_file(const char *filepath, char **output)
 
 b32 compute_haversine_sums(json_value *json_parse_result, b32 check_answers, i32 answers_fd)
 {
-	PROFILER_START_TIMING_BLOCK(compute_haversine_sums);
 	_assert(json_parse_result->type == JSON_VALUE_OBJECT);
 	_assert(json_parse_result->object->values_count == 1);
 	_assert(json_parse_result->object->values[0].type == JSON_VALUE_ARRAY);
 
 	json_value *haversine_points_list = json_parse_result->object->values[0].array->values;
 	u32 haversine_points_count = json_parse_result->object->values[0].array->values_count;
+	/* NOTE(josh): 32 bytes per haversine point -> 4 double-precision floating point values */
+	PROFILER_START_TIMING_BANDWIDTH(compute_haversine_sums, (haversine_points_count * 32));
 	u32 haversine_points_index = 0;
 	f64 x0, y0, x1, y1;
 	f64 haversine_accumulator = 0.0;

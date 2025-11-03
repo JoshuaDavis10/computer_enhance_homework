@@ -121,7 +121,7 @@ u32 json_parse(
 	json_value *json_values_out, 
 	u32 json_value_count_expected)
 {
-	PROFILER_START_TIMING_BLOCK(json_parse);
+	PROFILER_START_TIMING_BANDWIDTH(json_parse, json_txt_size);
 	_assert(jstring_temporary_memory_info.activated);
 	_assert(jstring_temporary_memory_info.address);
 	_assert(jstring_temporary_memory_info.offset == 0);

@@ -12,6 +12,7 @@ typedef struct {
 	const char *name;
 	u64 tsc_elapsed_inclusive;
 	u64 tsc_elapsed_exclusive;
+	u64 bytes_processed;
 	u32 hits;
 } profiler_unit;
 
@@ -33,7 +34,9 @@ static u32 global_parent_unit_index = 0;
 
 #define CONCAT(a, b) a##b
 
-#define PROFILER_START_TIMING_BLOCK(block_name) \
+#define PROFILER_START_TIMING_BLOCK(block_name) PROFILER_START_TIMING_BANDWIDTH(block_name, 0)
+
+#define PROFILER_START_TIMING_BANDWIDTH(block_name, bytes) \
 profiler_block CONCAT(profiler_block_, block_name); \
 { \
 	CONCAT(profiler_block_, block_name).tsc_start = read_cpu_timer(); \
@@ -45,6 +48,8 @@ profiler_block CONCAT(profiler_block_, block_name); \
 	CONCAT(profiler_block_, block_name).unit_tsc_inclusive = \
 		global_profiler.units[temp_unit_index].tsc_elapsed_inclusive; \
 	CONCAT(profiler_block_, block_name).parent_unit_index = global_parent_unit_index; \
+\
+	global_profiler.units[temp_unit_index].bytes_processed += bytes; \
 \
 	global_parent_unit_index = temp_unit_index; \
 }
@@ -93,6 +98,7 @@ static void finish_and_print_profile(void (*logger)(const char *, ...))
 	u32 unit_index = 1;
 	u64 elapsed_exclusive;
 	u64 elapsed_inclusive;
+	u64 bytes_processed;
 	while(unit_index < PROFILER_UNIT_COUNT)
 	{
 		elapsed_exclusive = global_profiler.units[unit_index].tsc_elapsed_exclusive;
@@ -112,9 +118,23 @@ static void finish_and_print_profile(void (*logger)(const char *, ...))
 				f64 percentage_with_children = 
 					((f64)elapsed_inclusive / 
 					(f64)total_elapsed) * 100.0;
-				logger("                 (%.2lf%% with children)", percentage_with_children);
+				logger("    (%.2lf%% with children)", percentage_with_children);
 			}
 		}
+
+		bytes_processed = global_profiler.units[unit_index].bytes_processed;
+		if(bytes_processed)
+		{
+			f64 megabyte = 1024.0 * 1024.0;
+			f64 gigabyte = megabyte * 1024.0;
+
+			f64 seconds = (f64)elapsed_inclusive / (f64)cpu_frequency;
+			f64 bytes_per_second = (f64)bytes_processed / seconds;
+			f64 megabytes = bytes_processed / megabyte;
+			f64 gigabytes_per_second = bytes_per_second / gigabyte;
+			logger("    %.3lfmb at %.2lfgb/s", megabytes, gigabytes_per_second); 
+		}
+
 		unit_index++;
 	}
 }
