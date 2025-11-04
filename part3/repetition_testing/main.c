@@ -30,27 +30,62 @@ typedef struct {
 
 void test_read(const char *filepath, buffer dest, repetition_tester *t) 
 {
+	printf("\n-----------------------------\nread test:\n");
 	while(repetition_tester_is_testing(t))
 	{
-		struct stat file_stat;
 		i32 fd;
-		u64 file_size;
 		if((fd = open(filepath, O_RDONLY)) == -1)
 		{
-			/* TODO: make these tester errors or smn */
-			log_error("Failed to open file: %s (errno: %d). Terminating program.", 
-				filepath, errno);
+			repetition_tester_error(t, "Failed to open file."); 
 		}
 
 		repetition_tester_start_timing(t);
 		u64 bytes_read = read(fd, dest.data, dest.size);
 		repetition_tester_stop_timing(t);
 
+		if(bytes_read == 0)
+		{
+			repetition_tester_error(t, "Read 0 bytes."); 
+		}
 		repetition_tester_count_bytes(t, bytes_read);
 
-		close(fd);
+		if(close(fd) == -1)
+		{
+			repetition_tester_error(t, "Failed to close file."); 
+		}
 	}
 }
+
+void test_fread(const char *filepath, buffer dest, repetition_tester *t) 
+{
+	printf("\n-----------------------------\nfread test:\n");
+	while(repetition_tester_is_testing(t))
+	{
+		FILE *file = fopen(filepath, "r");
+
+		if(!file)
+		{
+			repetition_tester_error(t, "Failed to open file."); 
+		}
+
+		repetition_tester_start_timing(t);
+		u64 bytes_read = fread(dest.data, 1, dest.size, file);
+		repetition_tester_stop_timing(t);
+
+		if(bytes_read == 0)
+		{
+			repetition_tester_error(t, "Read 0 bytes."); 
+		}
+
+		repetition_tester_count_bytes(t, bytes_read);
+
+		if(fclose(file) == EOF)
+		{
+			repetition_tester_error(t, "Failed to close file."); 
+		}
+	}
+}
+
 
 int main(int argc, char **argv)
 {
@@ -82,12 +117,10 @@ int main(int argc, char **argv)
 	read_buffer.data = malloc(file_size);
 	read_buffer.size = file_size;
 
-	repetition_tester t = {0};	
-	t.testing = true;	
-	t.test_length_tsc = 10 * read_cpu_frequency();
-	t.test_start_tsc = read_cpu_timer();
-
-	test_read(argv[1], read_buffer, &t); 
+	repetition_tester t1 = repetition_tester_create(10);	
+	test_read(argv[1], read_buffer, &t1); 
+	repetition_tester t2 = repetition_tester_create(10);	
+	test_fread(argv[1], read_buffer, &t2); 
 
 	free(read_buffer.data);
 
