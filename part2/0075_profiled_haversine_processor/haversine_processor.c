@@ -49,9 +49,9 @@ u64 read_file(const char *filepath, char **output)
 	/* XXX: st_size is an off_t, which I think is unsigned lol, keep in mind */
 	_assert(file_stat.st_size >= 0);
 	file_size = file_stat.st_size;
-	PROFILER_START_TIMING_BANDWIDTH(read_file, file_size);
 
 	(*output) = malloc(file_size+1); /* +1 for null terminator */
+	PROFILER_START_TIMING_BANDWIDTH(read_file, file_size);
 	if(read(fd, (*output), file_stat.st_size) == -1)
 	{
 		log_error("Failed to read(2) file: %s (errno: %d). Terminating program.", 

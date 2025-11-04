@@ -39,7 +39,6 @@ static u32 global_parent_unit_index = 0;
 #define PROFILER_START_TIMING_BANDWIDTH(block_name, bytes) \
 profiler_block CONCAT(profiler_block_, block_name); \
 { \
-	CONCAT(profiler_block_, block_name).tsc_start = read_cpu_timer(); \
 	/* NOTE(josh): __COUNTER__ is not in C standard but seems to work with gcc -std=c89 fine */ \
 	CONCAT(profiler_block_, block_name).unit_index = __COUNTER__ + 1; \
 \
@@ -52,6 +51,7 @@ profiler_block CONCAT(profiler_block_, block_name); \
 	global_profiler.units[temp_unit_index].bytes_processed += bytes; \
 \
 	global_parent_unit_index = temp_unit_index; \
+	CONCAT(profiler_block_, block_name).tsc_start = read_cpu_timer(); \
 }
 
 #define PROFILER_FINISH_TIMING_BLOCK(block_name) \
