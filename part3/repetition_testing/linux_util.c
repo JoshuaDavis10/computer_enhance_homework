@@ -152,3 +152,16 @@ static u64 read_cpu_frequency()
 
 	return(cpu_frequency);
 }
+
+/* resource usage */
+#include <sys/resource.h>
+i64 read_page_fault_count()
+{
+	struct rusage usage;
+	if(getrusage(RUSAGE_SELF, &usage) == -1)
+	{
+		log_warn("read_page_fault_count: failed to get resource usage (getrusage returned -1)");
+		return(-1);
+	}
+	return(usage.ru_minflt + usage.ru_majflt);
+}
