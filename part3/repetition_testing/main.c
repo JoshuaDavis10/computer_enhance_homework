@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 typedef double f64;
 typedef float f32;
@@ -23,20 +24,31 @@ typedef unsigned int b32;
 #include "linux_util.c"
 #include "repetition_tester.c"
 
+typedef enum {
+	TEST_ALLOC_NONE,
+	TEST_ALLOC_MALLOC,
+	TEST_ALLOC_MMAP_POPULATE,
+	TEST_ALLOC_TYPE_COUNT
+} test_alloc_type;
+
 typedef struct {
 	void *data;
 	u64 size;
 } buffer;
 
-void test_read(const char *filepath, buffer dest, repetition_tester *t, b32 with_mallocs) 
+void test_read(const char *filepath, buffer dest, repetition_tester *t, test_alloc_type alloc_type) 
 {
-	if(with_mallocs)
+	if(alloc_type == TEST_ALLOC_MALLOC)
 	{
 		printf("\n-----------------------------\nread test (mallocs):\n");
 	}
-	else
+	if(alloc_type == TEST_ALLOC_NONE)
 	{
 		printf("\n-----------------------------\nread test:\n");
+	}
+	if(alloc_type == TEST_ALLOC_MMAP_POPULATE)
+	{
+		printf("\n-----------------------------\nread test (mmap populate):\n");
 	}
 	while(repetition_tester_is_testing(t))
 	{
@@ -46,24 +58,44 @@ void test_read(const char *filepath, buffer dest, repetition_tester *t, b32 with
 			repetition_tester_error(t, "Failed to open file."); 
 		}
 
-		if(with_mallocs)
+		if(alloc_type == TEST_ALLOC_MALLOC)
 		{
 			dest.data = malloc(dest.size);
+			if(!dest.data)
+			{
+				repetition_tester_error(t, "Failed to malloc."); 
+			}
+		}
+		if(alloc_type == TEST_ALLOC_MMAP_POPULATE)
+		{
+			dest.data = mmap(0, dest.size, PROT_READ | PROT_WRITE, 
+				MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
+			if(dest.data == MAP_FAILED)
+			{
+				repetition_tester_error(t, "Failed to mmap."); 
+			}
 		}
 
 		repetition_tester_start_timing(t);
 		u64 bytes_read = read(fd, dest.data, dest.size);
 		repetition_tester_stop_timing(t);
 
-		if(bytes_read == 0)
+		if(bytes_read == 0 || bytes_read == -1)
 		{
 			repetition_tester_error(t, "Read 0 bytes."); 
 		}
 		repetition_tester_count_bytes(t, bytes_read);
 
-		if(with_mallocs)
+		if(alloc_type == TEST_ALLOC_MALLOC)
 		{
 			free(dest.data);
+		}
+		if(alloc_type == TEST_ALLOC_MMAP_POPULATE)
+		{
+			if(munmap(dest.data, dest.size) == -1)
+			{
+				repetition_tester_error(t, "Failed to munmap.");
+			}
 		}
 
 		if(close(fd) == -1)
@@ -73,28 +105,45 @@ void test_read(const char *filepath, buffer dest, repetition_tester *t, b32 with
 	}
 }
 
-void test_fread(const char *filepath, buffer dest, repetition_tester *t, b32 with_mallocs) 
+void test_fread(const char *filepath, buffer dest, repetition_tester *t, test_alloc_type alloc_type) 
 {
-	if(with_mallocs)
+
+	if(alloc_type == TEST_ALLOC_MALLOC)
 	{
 		printf("\n-----------------------------\nfread test (mallocs):\n");
 	}
-	else
+	if(alloc_type == TEST_ALLOC_NONE)
 	{
 		printf("\n-----------------------------\nfread test:\n");
+	}
+	if(alloc_type == TEST_ALLOC_MMAP_POPULATE)
+	{
+		printf("\n-----------------------------\nfread test (mmap populate):\n");
 	}
 	while(repetition_tester_is_testing(t))
 	{
 		FILE *file = fopen(filepath, "r");
-
 		if(!file)
 		{
 			repetition_tester_error(t, "Failed to open file."); 
 		}
 
-		if(with_mallocs)
+		if(alloc_type == TEST_ALLOC_MALLOC)
 		{
 			dest.data = malloc(dest.size);
+			if(!dest.data)
+			{
+				repetition_tester_error(t, "Failed to malloc."); 
+			}
+		}
+		if(alloc_type == TEST_ALLOC_MMAP_POPULATE)
+		{
+			dest.data = mmap(0, dest.size, PROT_READ | PROT_WRITE, 
+				MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
+			if(dest.data == MAP_FAILED)
+			{
+				repetition_tester_error(t, "Failed to mmap."); 
+			}
 		}
 
 		repetition_tester_start_timing(t);
@@ -105,12 +154,18 @@ void test_fread(const char *filepath, buffer dest, repetition_tester *t, b32 wit
 		{
 			repetition_tester_error(t, "Read 0 bytes."); 
 		}
-
 		repetition_tester_count_bytes(t, bytes_read);
 
-		if(with_mallocs)
+		if(alloc_type == TEST_ALLOC_MALLOC)
 		{
 			free(dest.data);
+		}
+		if(alloc_type == TEST_ALLOC_MMAP_POPULATE)
+		{
+			if(munmap(dest.data, dest.size) == -1)
+			{
+				repetition_tester_error(t, "Failed to munmap.");
+			}
 		}
 
 		if(fclose(file) == EOF)
@@ -151,16 +206,21 @@ int main(int argc, char **argv)
 	read_buffer.data = malloc(file_size);
 	read_buffer.size = file_size;
 
+	repetition_tester testers[6];
 	while(1)
 	{
-		repetition_tester t1 = repetition_tester_create(10);	
-		test_read(argv[1], read_buffer, &t1, false); 
-		repetition_tester t2 = repetition_tester_create(10);	
-		test_fread(argv[1], read_buffer, &t2, false); 
-		repetition_tester t3 = repetition_tester_create(10);	
-		test_read(argv[1], read_buffer, &t3, true); 
-		repetition_tester t4 = repetition_tester_create(10);	
-		test_fread(argv[1], read_buffer, &t4, true); 
+		testers[0] = repetition_tester_create(10);	
+		test_read(argv[1], read_buffer, &(testers[0]), TEST_ALLOC_MMAP_POPULATE); 
+		testers[1] = repetition_tester_create(10);	
+		test_fread(argv[1], read_buffer, &(testers[1]), TEST_ALLOC_MMAP_POPULATE); 
+		testers[2] = repetition_tester_create(10);	
+		test_read(argv[1], read_buffer, &(testers[2]), TEST_ALLOC_MALLOC); 
+		testers[3] = repetition_tester_create(10);	
+		test_fread(argv[1], read_buffer, &(testers[3]), TEST_ALLOC_MALLOC); 
+		testers[4] = repetition_tester_create(10);	
+		test_read(argv[1], read_buffer, &(testers[4]), TEST_ALLOC_NONE); 
+		testers[5] = repetition_tester_create(10);	
+		test_fread(argv[1], read_buffer, &(testers[5]), TEST_ALLOC_NONE); 
 	}
 
 	free(read_buffer.data);
