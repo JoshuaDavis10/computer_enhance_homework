@@ -1,9 +1,30 @@
 #!/usr/bin/bash
-
-echo -e "\e[1;33mBuilding..."
-echo -e "\e[1;37mgcc -std=c89 main.c -fsanitize=address -g -o read_test\e[0;31m"
-if gcc -std=c89 main.c -fsanitize=address -g -o read_test; then
+echo -e "\e[1;33mBuilding test..."
+echo -e "\e[1;37mnasm -f elf64 write_loop.asm -o write_loop.o\e[0;31m"
+if nasm -f elf64 write_loop.asm -o write_loop.o; then
+	:
+else
+	echo -e "\e[1;31mBuild failed.\e[0;30m"
+fi
+echo -e "\e[1;37mgcc write_loop.o main.c -O1 -o test\e[0;31m"
+if gcc write_loop.o main.c -O1 -o test; then
 	echo -e "\e[1;32mBuild succeeded.\e[0;30m"
 else
 	echo -e "\e[1;31mBuild failed.\e[0;30m"
 fi
+
+echo -e "\e[1;33mBuilding with NOP test..."
+echo -e "\e[1;37mnasm -f elf64 write_loop.asm -o write_loop.o\e[0;31m"
+if nasm -f elf64 write_loop.asm -o write_loop.o; then
+	:
+else
+	echo -e "\e[1;31mBuild failed.\e[0;30m"
+fi
+echo -e "\e[1;37mgcc write_loop.o nop_test_main.c -O1 -o nop_test\e[0;31m"
+if gcc write_loop.o nop_test_main.c -O1 -o nop_test; then
+	echo -e "\e[1;32mBuild succeeded.\e[0;30m"
+else
+	echo -e "\e[1;31mBuild failed.\e[0;30m"
+fi
+
+echo -e "\e[1;32mDone.\e[0;30m"

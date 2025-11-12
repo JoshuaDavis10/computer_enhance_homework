@@ -57,7 +57,7 @@ void repetition_tester_error(repetition_tester *t, const char *msg)
 
 repetition_tester repetition_tester_create(u64 test_length_seconds)
 {
-	repetition_tester result;
+	repetition_tester result = {0};
 	result.state = REPETITION_TESTER_STATE_INITIALIZED;
 	result.test_length_tsc = test_length_seconds * read_cpu_frequency();
 	result.test_start_tsc = read_cpu_timer();
@@ -83,6 +83,8 @@ b32 repetition_tester_is_testing(repetition_tester *t)
 			u64 cpu_frequency = read_cpu_frequency();
 			if(t->timer_start_count != t->timer_stop_count)
 			{
+				log_debug("%u (start count), %u (stop count)", 
+					t->timer_start_count, t->timer_stop_count);
 				log_error("REPETITION TESTER ERROR: test ran with uneven timer start count/timer" 
 						  "stop count");
 				return(false);
@@ -176,6 +178,10 @@ b32 repetition_tester_is_testing(repetition_tester *t)
 						(f64)t->test_max_page_faults, 
 						((f64)t->bytes_processed/(f64)1024.0)/(f64)t->test_max_page_faults); 
 				}
+				else
+				{
+					printf("                                                                                                   ");
+				}
 				printf("\n");
 				seconds = (f64)average / (f64)cpu_frequency;
 				printf("average: %llu, %.2lfms, %.3lfgb/s", average, seconds * 1000.0, 
@@ -185,6 +191,10 @@ b32 repetition_tester_is_testing(repetition_tester *t)
 					printf(", PFs: %.4lf (%.4lfkb/fault)", 
 						(f64)average_page_faults, 
 						((f64)t->bytes_processed/(f64)1024.0)/(f64)average_page_faults); 
+				}
+				else
+				{
+					printf("                                                                                                   ");
 				}
 				printf("\n");
 				return(false);
