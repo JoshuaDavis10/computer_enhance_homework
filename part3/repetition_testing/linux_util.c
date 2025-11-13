@@ -32,7 +32,7 @@ void log_warn(const char *message, ...) {
 	va_start(arg_ptr, message);
     vsnprintf(output, MAX_LOGGER_MESSAGE_SIZE, message, arg_ptr);
 	va_end(arg_ptr);
-	printf("\e[1;33m[WARN]:\e[0;33m %s\e[0m\r\n", output);
+	printf("\e[1;33m[WARN]: \e[0;33m %s\e[0m\r\n", output);
 }
 #else
 void log_warn(const char *message, ...) {
@@ -46,7 +46,7 @@ void log_info(const char *message, ...) {
 	va_start(arg_ptr, message);
     vsnprintf(output, MAX_LOGGER_MESSAGE_SIZE, message, arg_ptr);
 	va_end(arg_ptr);
-	printf("\e[1;32m[INFO]:\e[0;32m %s\e[0m\r\n", output);
+	printf("\e[1;32m[INFO]: \e[0;32m %s\e[0m\r\n", output);
 }
 #else
 void log_info(const char *message, ...) {

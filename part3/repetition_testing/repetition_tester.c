@@ -66,6 +66,7 @@ repetition_tester repetition_tester_create(u64 test_length_seconds)
 
 b32 repetition_tester_is_testing(repetition_tester *t)
 {
+	_assert(t);
 	switch(t->state)
 	{
 		case REPETITION_TESTER_STATE_ERROR:
