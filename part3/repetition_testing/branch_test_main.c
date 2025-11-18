@@ -1,5 +1,7 @@
 #include <sys/stat.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 typedef double f64;
 typedef float f32;
@@ -97,10 +99,21 @@ void branch_test(repetition_tester *t, buffer src, i32 branch_test_type)
 		} break;
 		case BRANCH_TEST_TYPE_TAKE_OS_RANDOM:
 		{
-			for( ; index < src.size; index++)
+			i32 urandom_fd = open("/dev/urandom", O_RDONLY);
+			if(urandom_fd == -1)
 			{
-				src.data[index] = rand() % 2; /* TODO: some OS random dev/urandom or smn */
+				repetition_tester_error(t, "failed to open /dev/urandom");
+				log_error("errno: %d", errno);
 			}
+			log_trace("opened /dev/urandom");
+			u64 bytes = read(urandom_fd, (src.data), src.size);
+			if(bytes != src.size)
+			{
+				repetition_tester_error(t, "did not read expected number of bytes");
+				log_error("expected number of bytes: %u, but read: %u", src.size, bytes);
+				log_error("errno: %d", errno);
+			}
+			log_trace("read %u bytes from /dev/urandom", bytes);
 			pattern_name = "OS Random";
 		} break;
 		default:
@@ -156,6 +169,8 @@ int main(int argc, char **argv)
 	repetition_tester testers[7];
 	while(1)
 	{
+		testers[6] = repetition_tester_create(10);
+		branch_test(testers+6, read_buffer, BRANCH_TEST_TYPE_TAKE_OS_RANDOM);
 		testers[0] = repetition_tester_create(10);
 		branch_test(testers, read_buffer, BRANCH_TEST_TYPE_ALWAYS_TAKE);
 		testers[1] = repetition_tester_create(10);
@@ -168,8 +183,6 @@ int main(int argc, char **argv)
 		branch_test(testers+4, read_buffer, BRANCH_TEST_TYPE_TAKE_EVERY_4);
 		testers[5] = repetition_tester_create(10);
 		branch_test(testers+5, read_buffer, BRANCH_TEST_TYPE_TAKE_CRT_RANDOM);
-		testers[6] = repetition_tester_create(10);
-		branch_test(testers+6, read_buffer, BRANCH_TEST_TYPE_TAKE_OS_RANDOM);
 	}
 
 	return(0);
