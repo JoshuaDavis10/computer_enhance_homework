@@ -1,4 +1,7 @@
 #!/usr/bin/bash
+
+# TODO: maybe make a makefile LOL
+
 echo -e "\e[1;33mBuilding test..."
 echo -e "\e[1;37mnasm -f elf64 write_loop.asm -o write_loop.o\e[0;31m"
 if nasm -f elf64 write_loop.asm -o write_loop.o; then
@@ -78,6 +81,20 @@ else
 fi
 echo -e "\e[1;37mgcc -fsanitize=address wide_read.o wide_read_test_main.c -o wide_read_test\e[0;31m"
 if gcc -fsanitize=address wide_read.o wide_read_test_main.c -o wide_read_test; then
+	echo -e "\e[1;32mBuild succeeded.\e[0;30m"
+else
+	echo -e "\e[1;31mBuild failed.\e[0;30m"
+fi
+
+echo -e "\e[1;33mBuilding cache size/bandwidth test..."
+echo -e "\e[1;37mnasm -f elf64 cache_size_bandwidth_read.asm -o cache_size_bandwidth_read.o\e[0;31m"
+if nasm -f elf64 cache_size_bandwidth_read.asm -o cache_size_bandwidth_read.o; then
+	:
+else
+	echo -e "\e[1;31mBuild failed.\e[0;30m"
+fi
+echo -e "\e[1;37mgcc -fsanitize=address cache_size_bandwidth_read.o cache_size_bandwidth_test_main.c -o cache_size_bandwidth_test\e[0;31m"
+if gcc -fsanitize=address cache_size_bandwidth_read.o cache_size_bandwidth_test_main.c -o cache_size_bandwidth_test; then
 	echo -e "\e[1;32mBuild succeeded.\e[0;30m"
 else
 	echo -e "\e[1;31mBuild failed.\e[0;30m"
